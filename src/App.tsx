@@ -1,12 +1,32 @@
 import { useState } from "react";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
+import { computeGoals, loadProfile, saveProfile, type Profile } from "./lib/profile";
+import Onboarding from "./components/Onboarding";
 
 export default function App() {
+  const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
+  const [editing, setEditing] = useState(false);
+
   const [description, setDescription] = useState("");
   const [items, setItems] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!profile || editing) {
+    return (
+      <Onboarding
+        initial={profile ?? undefined}
+        onDone={(p) => {
+          saveProfile(p);
+          setProfile(p);
+          setEditing(false);
+        }}
+      />
+    );
+  }
+
+  const goals = computeGoals(profile);
 
   async function handleEstimate() {
     setLoading(true);
@@ -21,8 +41,9 @@ export default function App() {
   }
 
   function updateItem(index: number, field: keyof FoodItem, value: string) {
-    setItems(items.map((item, i) =>
-      i === index ? { ...item, [field]: field === "name" || field === "assumption" || field === "confidence" ? value : Number(value) } : item
+    const textFields = ["name", "assumption", "confidence"];
+    setItems(items.map((it, i) =>
+      i === index ? { ...it, [field]: textFields.includes(field) ? value : Number(value) } : it
     ));
   }
 
@@ -37,14 +58,27 @@ export default function App() {
   );
 
   return (
-    <main className="mx-auto max-w-2xl p-4 space-y-6">
-      <h1 className="text-2xl font-bold">Suivi nutrition</h1>
+    <main className="mx-auto max-w-2xl space-y-6 p-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Suivi nutrition</h1>
+        <button onClick={() => setEditing(true)} className="text-sm text-green-700 underline">
+          Modifier mon profil
+        </button>
+      </div>
+
+      <section className="rounded border p-3">
+        <h2 className="mb-2 font-semibold">Vos objectifs estimés</h2>
+        <p className="text-sm">
+          {goals.calories} kcal · Protéines {goals.protein_g} g · Glucides {goals.carbs_g} g · Lipides {goals.fat_g} g
+        </p>
+        <p className="mt-1 text-xs text-gray-500">Estimation indicative, à ajuster selon votre ressenti.</p>
+      </section>
 
       <section className="space-y-2">
         <textarea
           className="w-full rounded border p-3"
           rows={3}
-          placeholder="Ex. 150 g de poulet grillé, 200 g de riz cuit, une cuillère d'huile d'olive"
+          placeholder="Ex. 150 g de poulet grillé, 200 g de riz cuit"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -75,10 +109,7 @@ export default function App() {
               </thead>
               <tbody>
                 {items.map((it, i) => (
-                  <tr
-                    key={i}
-                    className={`border-b ${it.confidence === "low" ? "bg-orange-50" : ""}`}
-                  >
+                  <tr key={i} className={`border-b ${it.confidence === "low" ? "bg-orange-50" : ""}`}>
                     <td className="p-1">
                       <input className="w-full" value={it.name} onChange={(e) => updateItem(i, "name", e.target.value)} />
                       <div className="text-xs text-gray-500">{it.assumption}</div>
@@ -91,7 +122,7 @@ export default function App() {
                   </tr>
                 ))}
                 <tr className="font-semibold">
-                  <td className="p-1">Total</td>
+                  <td className="p-1">Total du repas</td>
                   <td></td>
                   <td className="p-1">{Math.round(total.calories)}</td>
                   <td className="p-1">{Math.round(total.proteins)}</td>
@@ -101,6 +132,9 @@ export default function App() {
               </tbody>
             </table>
           </div>
+          <p className="text-sm">
+            Ce repas représente environ {Math.round((total.calories / goals.calories) * 100)} % de votre objectif calorique du jour.
+          </p>
         </section>
       )}
     </main>
