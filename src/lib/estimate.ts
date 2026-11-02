@@ -1,16 +1,6 @@
-import type { EstimateResult, FoodItem } from "./types";
+import type { FoodItem } from "./types";
 
-const isNum = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0;
-
-function isFoodItem(x: any): x is FoodItem {
-  return (
-    typeof x?.name === "string" &&
-    isNum(x.quantity_g) && isNum(x.calories) &&
-    isNum(x.proteins_g) && isNum(x.carbs_g) && isNum(x.fats_g) &&
-    ["high", "medium", "low"].includes(x.confidence) &&
-    typeof x.assumption === "string"
-  );
-}
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0);
 
 export async function estimateMeal(description: string): Promise<FoodItem[]> {
   const res = await fetch("/api/estimate", {
@@ -20,6 +10,20 @@ export async function estimateMeal(description: string): Promise<FoodItem[]> {
   });
   if (!res.ok) throw new Error("Estimation impossible, réessayez.");
 
-  const data: EstimateResult = await res.json();
-  return (data.items ?? []).filter(isFoodItem);
+  const data = await res.json();
+  const list: any[] = Array.isArray(data?.items) ? data.items : [];
+
+  // On garde les aliments avec un nom, et on met des valeurs par défaut pour les champs manquants
+  return list
+    .filter((x) => typeof x?.name === "string" && x.name.trim() !== "")
+    .map((x) => ({
+      name: x.name,
+      quantity_g: num(x.quantity_g),
+      calories: num(x.calories),
+      proteins_g: num(x.proteins_g),
+      carbs_g: num(x.carbs_g),
+      fats_g: num(x.fats_g),
+      confidence: ["high", "medium", "low"].includes(x.confidence) ? x.confidence : "low",
+      assumption: typeof x.assumption === "string" ? x.assumption : "",
+    }));
 }
