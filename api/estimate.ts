@@ -40,8 +40,10 @@ export default async function handler(req: any, res: any) {
     }
   );
 
-  if (!apiRes.ok) return res.status(502).json({ error: "Service IA indisponible" });
-
+if (!apiRes.ok) {
+  const detail = await apiRes.text();
+  return res.status(502).json({ error: "Service IA indisponible", status: apiRes.status, detail });
+}
   const data = await apiRes.json();
   const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
