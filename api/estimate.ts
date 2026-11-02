@@ -19,7 +19,7 @@ export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).end();
 
   const description = req.body?.description;
-  if (typeof description !== "string" || description.length === 0 || description.length > 500) {
+  if (typeof description !== "string" || description.length === 0 || description.length > 1500) {
     return res.status(400).json({ error: "Description invalide" });
   }
 

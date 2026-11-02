@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import type { Activity, Goal, Profile, Sex } from "../lib/profile";
 
 interface Props {
@@ -13,18 +13,20 @@ export default function Onboarding({ initial, onDone }: Props) {
   const [age, setAge] = useState(String(initial?.age ?? ""));
   const [height, setHeight] = useState(String(initial?.height_cm ?? ""));
   const [weight, setWeight] = useState(String(initial?.weight_kg ?? ""));
+  const [target, setTarget] = useState(String(initial?.target_weight_kg ?? ""));
   const [goal, setGoal] = useState<Goal>(initial?.goal ?? "maintenir");
   const [activity, setActivity] = useState<Activity>(initial?.activity ?? 1.375);
   const [error, setError] = useState<string | null>(null);
 
-  function submit(e: React.FormEvent) {
+  function submit(e: FormEvent) {
     e.preventDefault();
-    const a = Number(age), h = Number(height), w = Number(weight);
+    const a = Number(age), h = Number(height), w = Number(weight), t = Number(target);
     if (a < 14 || a > 100) return setError("L'âge doit être entre 14 et 100 ans.");
     if (h < 120 || h > 230) return setError("La taille doit être entre 120 et 230 cm.");
-    if (w < 30 || w > 300) return setError("Le poids doit être entre 30 et 300 kg.");
+    if (w < 30 || w > 300) return setError("Le poids actuel doit être entre 30 et 300 kg.");
+    if (t < 30 || t > 300) return setError("Le poids cible doit être entre 30 et 300 kg.");
     setError(null);
-    onDone({ sex, age: a, height_cm: h, weight_kg: w, goal, activity });
+    onDone({ sex, age: a, height_cm: h, weight_kg: w, target_weight_kg: t, goal, activity });
   }
 
   return (
@@ -48,6 +50,9 @@ export default function Onboarding({ initial, onDone }: Props) {
 
       <div><p className="mb-1 font-semibold">Poids actuel (kg)</p>
         <input className={field} type="number" step="0.1" value={weight} onChange={(e) => setWeight(e.target.value)} required /></div>
+
+      <div><p className="mb-1 font-semibold">Poids cible (kg)</p>
+        <input className={field} type="number" step="0.1" value={target} onChange={(e) => setTarget(e.target.value)} required /></div>
 
       <div><p className="mb-1 font-semibold">Objectif</p>
         <select className={field} value={goal} onChange={(e) => setGoal(e.target.value as Goal)}>

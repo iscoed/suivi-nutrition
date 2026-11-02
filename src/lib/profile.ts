@@ -7,6 +7,7 @@ export interface Profile {
   age: number;
   height_cm: number;
   weight_kg: number;
+  target_weight_kg: number;
   goal: Goal;
   activity: Activity;
 }
@@ -20,7 +21,7 @@ export interface Goals {
 
 const KEY = "suivi-nutrition-profil";
 
-// Estimation : métabolisme de base (Mifflin-St Jeor) x activité, puis ajustement selon l'objectif
+// Métabolisme de base (Mifflin-St Jeor) x activité, puis ajustement selon l'objectif
 export function computeGoals(p: Profile): Goals {
   const bmr = 10 * p.weight_kg + 6.25 * p.height_cm - 5 * p.age + (p.sex === "homme" ? 5 : -161);
   const tdee = bmr * p.activity;
@@ -37,7 +38,10 @@ export function computeGoals(p: Profile): Goals {
 export function loadProfile(): Profile | null {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Profile) : null;
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Profile;
+    // Compatibilité avec un ancien profil sans poids cible
+    return p.target_weight_kg ? p : { ...p, target_weight_kg: p.weight_kg };
   } catch {
     return null;
   }
