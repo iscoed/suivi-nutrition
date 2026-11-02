@@ -23,29 +23,31 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: "Description invalide" });
   }
 
-  const model = "gemini-2.5-flash";
-  const apiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": process.env.GEMINI_API_KEY!,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents: [{ role: "user", parts: [{ text: description }] }],
-        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 1000 },
-      }),
-    }
-  );
+  const apiRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: description },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1000,
+      temperature: 0.2,
+    }),
+  });
 
-if (!apiRes.ok) {
-  const detail = await apiRes.text();
-  return res.status(502).json({ error: "Service IA indisponible", status: apiRes.status, detail });
-}
+  if (!apiRes.ok) {
+    const detail = await apiRes.text();
+    return res.status(502).json({ error: "Service IA indisponible", status: apiRes.status, detail });
+  }
+
   const data = await apiRes.json();
-  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const text: string = data.choices?.[0]?.message?.content ?? "";
 
   try {
     const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
