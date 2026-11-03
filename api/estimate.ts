@@ -58,11 +58,7 @@ function parseProductPage(html: string) {
   const fats = get(/Matières grasses \(g\)\s*:\s*([\d.,]+)/i);
   if (kcal === null || proteins === null || carbs === null || fats === null) return null;
 
-  const idx = text.search(/Valeurs nutritionnelles/i);
-  const after = idx >= 0 ? text.slice(idx) : text;
-  const portionMatch = after.match(/(\d+(?:[.,]\d+)?)\s*(?:grammes|g)\b/i);
-  const portion = portionMatch ? num(portionMatch[1]) : null;
-
+  const portionMatch = text.match(/(\d+(?:[.,]\d+)?)\s*grammes\b/i);  const portion = portionMatch ? num(portionMatch[1]) : null;
   const title = (html.match(/<title>([^<]+)<\/title>/i)?.[1] ?? "").trim();
   return { title, per100: { kcal, proteins, carbs, fats }, portion };
 }
