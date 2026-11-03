@@ -64,11 +64,16 @@ export default function Advice({ slots, remaining }: Props) {
     }
   }
 
-  useEffect(() => {
-    ask(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingKey, remainingKey]);
 
+  <button
+          onClick={() => ask(plans.length > 0)}
+          disabled={loading || pending.length === 0}
+          className="rounded-full bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+        >
+          {loading ? "Réflexion…" : plans.length > 0 ? "Alternatives" : "Proposer le plan"}
+        </button>
+
+        
   const dinnerPending = pending.some((s) => s.key === "dinner");
 
   return (
