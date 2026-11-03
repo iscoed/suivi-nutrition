@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DINNER_LIMITS } from "../lib/planning";
 
 export interface SlotStatus {
@@ -31,9 +31,8 @@ export default function Advice({ slots, remaining }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const pending = slots.filter((s) => !s.done);
-  const pendingKey = pending.map((s) => s.key).join(",");
-  const remainingKey = JSON.stringify(remaining);
 
+  // Le plan ne se lance qu'au clic, pour économiser le quota de l'IA
   async function ask(alternative: boolean) {
     if (pending.length === 0) {
       setPlans([]);
@@ -64,38 +63,30 @@ export default function Advice({ slots, remaining }: Props) {
     }
   }
 
-
-  <button
-          onClick={() => ask(plans.length > 0)}
-          disabled={loading || pending.length === 0}
-          className="rounded-full bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          {loading ? "Réflexion…" : plans.length > 0 ? "Alternatives" : "Proposer le plan"}
-        </button>
-
-        
   const dinnerPending = pending.some((s) => s.key === "dinner");
 
   return (
-    <section className="space-y-3 rounded border p-4">
-      <div className="flex items-center justify-between">
+    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+      <div className="mb-4 flex items-center justify-between">
         <h2 className="font-semibold">Plan de la journée</h2>
         <button
-          onClick={() => ask(true)}
+          onClick={() => ask(plans.length > 0)}
           disabled={loading || pending.length === 0}
-          className="rounded-full bg-green-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
         >
-          {loading ? "Réflexion…" : "Alternatives"}
+          {loading ? "Réflexion…" : plans.length > 0 ? "Alternatives" : "Proposer le plan"}
         </button>
       </div>
 
-      {advice && <p className="text-sm">{advice}</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {advice && (
+        <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{advice}</p>
+      )}
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b text-left text-gray-500">
+            <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
               <th className="py-2 pr-2">Moment</th>
               <th className="py-2 pr-2">État</th>
               <th className="py-2">Propositions</th>
@@ -105,40 +96,40 @@ export default function Advice({ slots, remaining }: Props) {
             {slots.map((s) => {
               const plan = plans.find((p) => p.slot === s.key);
               return (
-                <tr key={s.key} className="border-b align-top">
-                  <td className="py-2 pr-2 font-medium">
+                <tr key={s.key} className="border-b border-gray-100 align-top">
+                  <td className="py-3 pr-2 font-medium">
                     {s.label}
-                    <div className="text-xs font-normal text-gray-500">{s.time}</div>
+                    <div className="text-xs font-normal text-gray-400">{s.time}</div>
                   </td>
-                  <td className="py-2 pr-2">
+                  <td className="py-3 pr-2">
                     {s.done ? (
-                      <div className="text-green-700">
+                      <div className="text-emerald-700">
                         ✔ Déjà mangé
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-gray-500">
                           {Math.round(s.eaten.calories)} kcal · P {Math.round(s.eaten.proteins)} g · G {Math.round(s.eaten.carbs)} g · L {Math.round(s.eaten.fats)} g
                         </div>
                       </div>
                     ) : (
-                      <span className="text-gray-500">À venir</span>
+                      <span className="text-gray-400">À venir</span>
                     )}
                   </td>
-                  <td className="py-2">
+                  <td className="py-3">
                     {s.done ? (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-gray-300">—</span>
                     ) : plan && plan.options.length > 0 ? (
                       plan.options.map((o, i) => (
-                        <div key={i} className="mb-2 rounded bg-gray-50 p-2">
+                        <div key={i} className="mb-2 rounded-xl bg-gray-50 p-3">
                           <p className="font-medium">{o.title}</p>
-                          <p className="text-xs text-gray-700">
+                          <p className="text-xs text-emerald-700">
                             {Math.round(o.calories)} kcal · P {o.proteins_g} g · G {o.carbs_g} g · L {o.fats_g} g
                           </p>
-                          <p className="text-xs text-gray-600">
+                          <p className="text-xs text-gray-500">
                             {o.foods.map((f) => `${f.name} ${f.quantity_g} g`).join(" · ")}
                           </p>
                         </div>
                       ))
                     ) : (
-                      <span className="text-gray-400">{loading ? "…" : "—"}</span>
+                      <span className="text-gray-300">{loading ? "…" : "—"}</span>
                     )}
                   </td>
                 </tr>
@@ -149,7 +140,7 @@ export default function Advice({ slots, remaining }: Props) {
       </div>
 
       {dinnerPending && (
-        <ul className="list-disc pl-5 text-xs text-gray-500">
+        <ul className="mt-4 list-disc pl-5 text-xs text-gray-400">
           {DINNER_LIMITS.map((l) => <li key={l}>{l}</li>)}
         </ul>
       )}
