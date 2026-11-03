@@ -1,3 +1,4 @@
+import Summary from "./components/Summary";
 import Weights from "./components/Weights";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
@@ -280,7 +281,11 @@ export default function App() {
         )}
 
         <Advice slots={slotStatus} remaining={remaining} />
-
+        <Summary
+          remaining={remaining}
+          sex={(profile.sex as "homme" | "femme") ?? "homme"}
+          dinnerPlanned={slotStatus.some((s) => s.key === "dinner" && !s.done)}
+        />
         <section className={card}>
           <h2 className="mb-3 font-semibold">Repas du {date}</h2>
           {dayEntries.length === 0 && <p className="text-sm text-gray-400">Rien d'enregistré pour ce jour.</p>}
