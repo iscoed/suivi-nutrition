@@ -1,3 +1,4 @@
+import Summary from "./components/Summary";
 import Advice from "./components/Advice";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
@@ -193,7 +194,19 @@ export default function App() {
           fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
         }}
       />
-      
+
+      <Summary
+         date={date}
+          profile={profile}
+          remaining={{
+           calories: Math.max(0, Math.round(goals.calories - eaten.calories)),
+           proteins_g: Math.max(0, Math.round(goals.protein_g - eaten.proteins)),
+           carbs_g: Math.max(0, Math.round(goals.carbs_g - eaten.carbs)),
+           fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
+          }}
+        />
+
+     
       <section className="space-y-2">
         <h2 className="font-semibold">Ajouter ce que vous avez mangé</h2>
         <textarea
