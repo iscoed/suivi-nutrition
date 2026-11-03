@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { buildPlans } from "../lib/planner";
 import { DINNER_LIMITS } from "../lib/planning";
 
 export interface SlotStatus {
@@ -10,6 +9,16 @@ export interface SlotStatus {
   eaten: { calories: number; proteins: number; carbs: number; fats: number };
 }
 
+interface Option {
+  title: string;
+  foods: { name: string; grams: number }[];
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+}
+interface Plan { slot: string; options: Option[] }
+
 interface Props {
   slots: SlotStatus[];
   remaining: { calories: number; proteins_g: number; carbs_g: number; fats_g: number };
@@ -19,16 +28,38 @@ const r1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString("fr-FR");
 const r0 = (v: number) => Math.round(v).toLocaleString("fr-FR");
 
 export default function Advice({ slots, remaining }: Props) {
-  // -1 = plan pas encore demandé ; sinon, décalage pour « Alternatives »
   const [offset, setOffset] = useState(-1);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const pending = slots.filter((s) => !s.done);
-  const plans = offset >= 0 ? buildPlans(pending, remaining, offset) : [];
-  const dinnerPending = pending.some((s) => s.key === "dinner");
 
-  function next() {
-    setOffset(offset < 0 ? 0 : offset + 1);
+  async function run(nextOffset: number) {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slots: pending.map((s) => ({ key: s.key })),
+          remaining,
+          offset: nextOffset,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Plan indisponible");
+      setPlans(data.plans ?? []);
+      setOffset(nextOffset);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }
+
+  const dinnerPending = pending.some((s) => s.key === "dinner");
 
   const message =
     pending.length === 0
@@ -42,15 +73,16 @@ export default function Advice({ slots, remaining }: Props) {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-semibold">Plan de la journée</h2>
         <button
-          onClick={next}
-          disabled={pending.length === 0}
+          onClick={() => run(offset < 0 ? 0 : offset + 1)}
+          disabled={loading || pending.length === 0}
           className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
         >
-          {offset < 0 ? "Proposer le plan" : "Alternatives"}
+          {loading ? "Calcul…" : offset < 0 ? "Proposer le plan" : "Alternatives"}
         </button>
       </div>
 
       <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -93,7 +125,7 @@ export default function Advice({ slots, remaining }: Props) {
                             {r0(o.kcal)} kcal · P {r1(o.p)} g · G {r1(o.c)} g · L {r1(o.f)} g
                           </p>
                           <p className="text-xs text-gray-500">
-                            {o.foods.map((f) => `${f.name} : ${f.grams} g`).join(" · ")}
+                            {o.foods.map((f) => `${f.name} ${f.grams} g`).join(" · ")}
                           </p>
                         </div>
                       ))

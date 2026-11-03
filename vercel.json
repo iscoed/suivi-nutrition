@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/estimate.ts": {
+    "api/*.ts": {
       "includeFiles": "src/data/foods.json"
     }
   }
