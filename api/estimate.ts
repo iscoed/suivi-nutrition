@@ -7,11 +7,11 @@ Schéma exact :
 
 Règles essentielles :
 - Découpe la phrase en aliments distincts. Chaque aliment a ses propres valeurs.
-- Si l'utilisateur donne les valeurs d'un produit, utilise ces valeurs et calcule pour la quantité indiquée.
-- Si la quantité d'un produit emballé n'est pas précisée, prends une unité (1 barre, 1 portion) et écris-le dans assumption.
-- Si un "Contenu de la page produit" est fourni, utilise uniquement ce contenu pour les valeurs. N'invente jamais de valeurs qui ne figurent pas dans ce contenu.
-- Si la page n'a pas pu être lue, tu peux estimer à partir du nom du produit : mets confidence="low" et assumption="Valeurs estimées à partir du nom, à vérifier sur l'emballage", et demande dans clarifying_questions de coller le tableau nutritionnel.
-- Les valeurs correspondent à la quantité indiquée, pas à 100 g, sauf si la quantité est 100 g.
+- Si le contenu d'une page produit est fourni, utilise ses valeurs "pour 100 g" : valeur × quantité mangée / 100.
+- Si la page indique une portion en grammes (ex. "60 grammes") et que l'utilisateur dit "1 barre" ou "une portion", utilise cette portion comme quantité_g, et écris "Portion de la page : 60 g" dans assumption.
+- Ne mets JAMAIS 0 pour une valeur si elle figure dans le contenu fourni.
+- N'invente aucune valeur absente du contenu. Si aucune valeur n'est lisible, renvoie "items":[] et demande de coller le tableau nutritionnel.
+- Les valeurs correspondent à la quantité mangée, pas à 100 g, sauf si la quantité est 100 g.
 - Distingue poids cru et poids cuit. Si ce n'est pas précisé et que cela change fortement les valeurs, mets state="unknown" et pose une question.
 - Ce sont des estimations. Pas de conseil médical.
 - Si le message ne décrit pas de repas, renvoie {"items":[],"clarifying_questions":["Pouvez-vous décrire ce que vous avez mangé ?"]}.`;
@@ -34,17 +34,14 @@ function cleanUrl(raw: string): URL | null {
   }
 }
 
-// Déduit un nom de produit à partir de l'adresse : /products/pro-dome-bar-salted-caramel -> "pro dome bar salted caramel"
 function nameFromUrl(u: URL): string {
   const last = u.pathname.split("/").filter(Boolean).pop() ?? "";
   return decodeURIComponent(last).replace(/[-_]+/g, " ").trim();
 }
 
-function htmlToText(html: string): string {
-  const jsonLd = [...html.matchAll(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)]
-    .map((m) => m[1])
-    .join("\n");
-  const body = html
+// Texte brut de la page, sans scripts, styles ni balises
+function plainText(html: string): string {
+  return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<[^>]+>/g, " ")
@@ -53,7 +50,27 @@ function htmlToText(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/\s+/g, " ");
-  return (jsonLd + "\n" + body).slice(0, 8000);
+}
+
+// Extrait la zone utile : titre, tableau nutritionnel et portion, sans les menus
+function extractUseful(html: string): string | null {
+  const text = plainText(html);
+
+  const title = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim() ?? "";
+
+  let nutrition = "";
+  const idx = text.search(/Valeurs nutritionnelles/i);
+  if (idx >= 0) {
+    nutrition = text.slice(idx, idx + 1000);
+  } else {
+    const kcal = text.search(/kcal/i);
+    if (kcal >= 0) nutrition = text.slice(Math.max(0, kcal - 300), kcal + 700);
+  }
+
+  const portion = text.match(/[^.]{0,30}\b\d+\s*(?:grammes|g)\b[^.]{0,30}/i)?.[0]?.trim() ?? "";
+
+  if (!nutrition) return null;
+  return `Titre : ${title}\n${nutrition}\nPortion indiquée : ${portion}`;
 }
 
 async function fetchProductPage(url: string): Promise<string | null> {
@@ -66,9 +83,7 @@ async function fetchProductPage(url: string): Promise<string | null> {
       redirect: "follow",
     });
     if (!r.ok) return null;
-    const text = htmlToText(await r.text());
-    // Une page qui contient moins de 300 caractères utiles n'a pas de valeurs lisibles
-    return text.length >= 300 ? text : null;
+    return extractUseful(await r.text());
   } catch {
     return null;
   }
@@ -116,11 +131,10 @@ export default async function handler(req: any, res: any) {
     content = description.replace(found[0], "[lien produit]");
     const u = cleanUrl(found[0]);
     if (u) {
-      const name = nameFromUrl(u);
-      const pageText = await fetchProductPage(u.toString());
-      content += pageText
-        ? `\n\nContenu de la page produit (${u.toString()}) :\n${pageText}`
-        : `\n\nNom du produit déduit du lien : "${name}". Le contenu de la page n'a pas pu être lu.`;
+      const page = await fetchProductPage(u.toString());
+      content += page
+        ? `\n\nContenu de la page produit (${u.toString()}) :\n${page}`
+        : `\n\nNom du produit déduit du lien : "${nameFromUrl(u)}". Le tableau nutritionnel n'a pas pu être lu : demande de le coller.`;
     }
   }
 
