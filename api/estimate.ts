@@ -1,4 +1,9 @@
-const SYSTEM_PROMPT = `Tu es un assistant de journal alimentaire. Analyse uniquement les aliments et quantités fournis par l'utilisateur. Réponds en français.
+import { searchFood, macrosFor } from "../src/lib/search";
+
+const SYSTEM_PROMPT = `Tu es un assistant de journal alimentaire. Réponds en français.
+
+Tu reçois une liste d'aliments que la base de référence ne connaît pas, ou dont la quantité n'est pas précise.
+Pour chacun, estime les valeurs pour la quantité indiquée, ou pour une portion courante si aucune quantité n'est donnée, et écris cette portion dans assumption.
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises markdown.
 
@@ -6,19 +11,59 @@ Schéma exact :
 {"items":[{"name":string,"quantity_g":number,"calories":number,"proteins_g":number,"carbs_g":number,"fats_g":number,"state":"raw"|"cooked"|"unknown","confidence":"high"|"medium"|"low","assumption":string}],"clarifying_questions":[string]}
 
 Règles :
-- Découpe la phrase en aliments distincts. Chaque aliment a ses propres valeurs pour la quantité indiquée.
-- Si la quantité n'est pas précisée, estime une portion courante et écris-la dans assumption.
-- N'invente pas de marque ni de valeurs de produit emballé.
-- Distingue poids cru et poids cuit. Si ce n'est pas précisé et que cela change fortement les valeurs, mets state="unknown" et pose une question.
-- Ce sont des estimations. Pas de conseil médical.
-- Si le message ne décrit pas de repas, renvoie {"items":[],"clarifying_questions":["Pouvez-vous décrire ce que vous avez mangé ?"]}.`;
+- N'invente pas de marque ni de valeurs de produit emballé. Si tu ne connais pas le produit, mets confidence="low".
+- Ce sont des estimations. Pas de conseil médical.`;
 
 const MODEL = "openai/gpt-oss-20b";
-const TRACKING = /^(utm_|gclid|gad_|gbraid|wbraid|fbclid|srsltid)/i;
 const URL_RE = /https?:\/\/[^\s]+/i;
+const TRACKING = /^(utm_|gclid|gad_|gbraid|wbraid|fbclid|srsltid)/i;
+const NOISE = /j[’']ai mang[ée]|ce matin|ce midi|ce soir|le matin|à midi|midi|soir|environ|un peu d[e’']?|quelques?|une petite|un petit/gi;
+
+// Poids moyen d'une unité quand l'utilisateur écrit "4 oeufs" ou "2 tranches"
+const UNIT_G: Record<string, number> = {
+  oeuf: 55,
+  barre: 60,
+  pomme: 150,
+  banane: 120,
+  yaourt: 125,
+  tranche: 30,
+  cuillere: 15,
+};
 
 const num = (s: string) => Number(s.replace(",", "."));
 const round1 = (v: number) => Math.round(v * 10) / 10;
+const norm = (s: string) =>
+  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/œ/g, "oe");
+
+function parseSegment(raw: string): { name: string; grams: number | null } | null {
+  const s = raw.replace(NOISE, " ").replace(/\s+/g, " ").trim();
+  if (!s) return null;
+
+  let grams: number | null = null;
+  let name = s;
+
+  const gMatch = s.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grammes?)\b/i);
+  const countMatch = s.match(/^(\d+(?:[.,]\d+)?)\s+([^\d].*)$/);
+
+  if (gMatch) {
+    grams = num(gMatch[1]);
+    name = s.replace(gMatch[0], " ");
+  } else if (countMatch) {
+    const qty = num(countMatch[1]);
+    const word = norm(countMatch[2]).replace(/[^a-z ]/g, "").split(" ")[0];
+    const unit = UNIT_G[word] ?? UNIT_G[word.replace(/s$/, "")];
+    name = countMatch[2];
+    if (unit) grams = qty * unit;
+  }
+
+  name = name
+    .replace(/\b(de|du|des|d|la|le|les|un|une|à)\b/gi, " ")
+    .replace(/['’]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { name, grams };
+}
 
 function cleanUrl(raw: string): URL | null {
   try {
@@ -45,7 +90,7 @@ function plainText(html: string): string {
     .replace(/\s+/g, " ");
 }
 
-// Lit le tableau "pour 100 g" et la portion sur la page produit
+// Lit le tableau "pour 100 g" et la portion d'une page produit
 function parseProductPage(html: string) {
   const text = plainText(html);
   const get = (re: RegExp) => {
@@ -92,7 +137,7 @@ function parseJson(text: string) {
   return JSON.parse(clean.slice(start, end + 1));
 }
 
-// Appel au modèle pour le texte libre (les autres aliments)
+// Appel à l'IA, uniquement pour les aliments introuvables dans la base
 async function askModel(content: string) {
   let lastText = "";
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -109,7 +154,7 @@ async function askModel(content: string) {
           { role: "user", content },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 55500,
+        max_tokens: 2000,
         temperature: 0.1,
       }),
     });
@@ -129,25 +174,25 @@ export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).end();
 
   const description = req.body?.description;
-  if (typeof description !== "string" || description.length === 0 || description.length > 1500) {
+  if (typeof description !== "string" || !description.trim() || description.length > 1500) {
     return res.status(400).json({ error: "Description invalide" });
   }
 
   const items: any[] = [];
   const questions: string[] = [];
-  let rest = description;
+  let text = description;
 
   try {
+    // 1. Lien produit : valeurs de la page, calculées côté serveur
     const urlMatch = description.match(URL_RE);
     if (urlMatch) {
-      rest = description.replace(urlMatch[0], " ");
+      text = description.replace(urlMatch[0], " , ");
       const u = cleanUrl(urlMatch[0]);
       const html = u ? await fetchHtml(u.toString()) : null;
       const product = html ? parseProductPage(html) : null;
 
       if (product) {
-        // Quantité : celle écrite en grammes par l'utilisateur, sinon la portion de la page
-        const userG = rest.match(/(\d+(?:[.,]\d+)?)\s*(?:g|grammes)\b/i);
+        const userG = text.match(/(\d+(?:[.,]\d+)?)\s*(?:g|gr|grammes?)\b/i);
         const qty = userG ? num(userG[1]) : product.portion;
         if (!qty) {
           questions.push("Quelle quantité avez-vous mangée (en grammes ou en nombre de barres) ?");
@@ -166,20 +211,49 @@ export default async function handler(req: any, res: any) {
             assumption: `Valeurs de la page produit (pour 100 g) × ${qty} g`,
           });
         }
-      } else {
+      } else if (u) {
         questions.push("Je n'arrive pas à lire le tableau nutritionnel de ce site. Collez-le dans votre message, ou tapez les valeurs.");
       }
     }
 
-    // Le reste du texte (autres aliments) passe par l'IA, sans la barre déjà traitée
-    const restForModel = rest
-      .replace(/j[’']ai mang[ée]/gi, " ")
-      .replace(/(?:une?|1)\s*(?:barres?|portions?)/gi, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    // 2. Découpage en aliments, recherche dans CIQUAL
+    const segments = text
+      .split(/,|;|\bet\b|\+|\n|\bpuis\b|\bavec\b/i)
+      .map(parseSegment)
+      .filter((s): s is { name: string; grams: number | null } => s !== null);
 
-    if (restForModel.replace(/[^a-zA-Zà-ÿ]/g, "").length >= 4) {
-      const out = await askModel(restForModel);
+    const unmatched: string[] = [];
+
+    for (const seg of segments) {
+      const letters = seg.name.replace(/[^a-zA-Zà-ÿ]/g, "");
+      if (letters.length < 3 || /^(ca|ce|cela|ça)$/i.test(seg.name)) continue;
+
+      const food =
+        seg.grams !== null ? searchFood(seg.name) ?? searchFood(seg.name.split(" ")[0]) : null;
+
+      if (food && seg.grams !== null) {
+        const m = macrosFor(food, seg.grams);
+        items.push({
+          name: seg.name,
+          quantity_g: seg.grams,
+          calories: m.calories,
+          proteins_g: m.proteins_g,
+          carbs_g: m.carbs_g,
+          fats_g: m.fats_g,
+          state: "unknown",
+          confidence: "high",
+          assumption: `CIQUAL : ${food.n}`,
+        });
+      } else {
+        unmatched.push(seg.grams !== null ? `${seg.grams} g de ${seg.name}` : seg.name);
+      }
+    }
+
+    // 3. L'IA ne sert qu'aux aliments absents de la base
+    if (unmatched.length > 0) {
+      const out = await askModel(
+        "Aliments à estimer :\n" + unmatched.map((u) => `- ${u}`).join("\n")
+      );
       if (Array.isArray(out.items)) items.push(...out.items);
       if (Array.isArray(out.clarifying_questions)) questions.push(...out.clarifying_questions);
     }
