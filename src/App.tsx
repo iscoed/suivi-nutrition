@@ -1,13 +1,14 @@
-import Summary from "./components/Summary";
-import Advice from "./components/Advice";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
 import Onboarding from "./components/Onboarding";
+import Advice from "./components/Advice";
+import Summary from "./components/Summary";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
 import { newId, rescale, todayKey, totals, type Entry } from "./lib/journal";
+import { mealComment, sumItems } from "./lib/comment";
 import {
   loadCloudProfile, saveCloudProfile, loadCloudEntries, insertCloudEntries,
   updateCloudEntry, deleteCloudEntry,
@@ -63,15 +64,14 @@ export default function App() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastComment, setLastComment] = useState<string | null>(null);
 
-  // Suit la connexion
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(!!data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(!!s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Charge profil et repas dès la connexion
   useEffect(() => {
     if (!session) return;
     (async () => {
@@ -103,6 +103,12 @@ export default function App() {
   const eaten = totals(dayEntries);
   const pendingTotal = totals(pending.map((p) => ({ ...p, date: "" }) as Entry));
   const diffKg = Math.round((profile.weight_kg - profile.target_weight_kg) * 10) / 10;
+  const remaining = {
+    calories: Math.max(0, Math.round(goals.calories - eaten.calories)),
+    proteins_g: Math.max(0, Math.round(goals.protein_g - eaten.proteins)),
+    carbs_g: Math.max(0, Math.round(goals.carbs_g - eaten.carbs)),
+    fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
+  };
 
   async function analyze() {
     setLoading(true);
@@ -126,6 +132,7 @@ export default function App() {
     try {
       await insertCloudEntries(list);
       setEntries([...entries, ...list]);
+      setLastComment(mealComment(sumItems(list), list.length === 1 ? list[0].name : "Ce repas"));
       setPending([]);
       setQuestions([]);
       setDescription("");
@@ -176,37 +183,6 @@ export default function App() {
         </p>
       </section>
 
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <h2 className="font-semibold">Journée du</h2>
-          <input type="date" className="rounded border p-1" value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <Stat label="Calories" eaten={eaten.calories} goal={goals.calories} unit="kcal" />
-        <Stat label="Protéines" eaten={eaten.proteins} goal={goals.protein_g} unit="g" />
-        <Stat label="Glucides" eaten={eaten.carbs} goal={goals.carbs_g} unit="g" />
-        <Stat label="Lipides" eaten={eaten.fats} goal={goals.fat_g} unit="g" />
-      </section>
-      <Advice
-        remaining={{
-          calories: Math.max(0, Math.round(goals.calories - eaten.calories)),
-          proteins_g: Math.max(0, Math.round(goals.protein_g - eaten.proteins)),
-          carbs_g: Math.max(0, Math.round(goals.carbs_g - eaten.carbs)),
-          fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
-        }}
-      />
-
-      <Summary
-         date={date}
-          profile={profile}
-          remaining={{
-           calories: Math.max(0, Math.round(goals.calories - eaten.calories)),
-           proteins_g: Math.max(0, Math.round(goals.protein_g - eaten.proteins)),
-           carbs_g: Math.max(0, Math.round(goals.carbs_g - eaten.carbs)),
-           fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
-          }}
-        />
-
-     
       <section className="space-y-2">
         <h2 className="font-semibold">Ajouter ce que vous avez mangé</h2>
         <textarea
@@ -246,8 +222,29 @@ export default function App() {
         </section>
       )}
 
+      {lastComment && (
+        <section className="rounded border border-green-400 bg-green-50 p-3 text-sm">
+          <p>{lastComment}</p>
+        </section>
+      )}
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <h2 className="font-semibold">Journée du</h2>
+          <input type="date" className="rounded border p-1" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <Stat label="Calories" eaten={eaten.calories} goal={goals.calories} unit="kcal" />
+        <Stat label="Protéines" eaten={eaten.proteins} goal={goals.protein_g} unit="g" />
+        <Stat label="Glucides" eaten={eaten.carbs} goal={goals.carbs_g} unit="g" />
+        <Stat label="Lipides" eaten={eaten.fats} goal={goals.fat_g} unit="g" />
+      </section>
+
+      <Advice remaining={remaining} />
+
+      <Summary date={date} profile={profile} remaining={remaining} />
+
       <section className="space-y-3">
-        <h2 className="font-semibold">Journal du {date}</h2>
+        <h2 className="font-semibold">Repas du {date}</h2>
         {dayEntries.length === 0 && <p className="text-sm text-gray-500">Rien d'enregistré pour ce jour.</p>}
         {dayEntries.length > 0 && (
           <EntryTable
