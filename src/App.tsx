@@ -1,3 +1,4 @@
+import Photo from "./components/Photo";
 import Summary from "./components/Summary";
 import Weights from "./components/Weights";
 import { useEffect, useState } from "react";
@@ -244,8 +245,15 @@ export default function App() {
             <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
               {loading ? "Analyse…" : "Analyser"}
             </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+                            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
+                  <Photo
+          onResult={(items, qs) => {
+            setPending(items);
+            setQuestions(qs);
+            setError(null);
+          }}
+        />
         </section>
 
         {questions.length > 0 && (
