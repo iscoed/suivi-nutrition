@@ -109,7 +109,7 @@ async function askModel(content: string) {
           { role: "user", content },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 2500,
+        max_tokens: 55500,
         temperature: 0.1,
       }),
     });
