@@ -4,7 +4,6 @@ import Auth from "./components/Auth";
 import Onboarding from "./components/Onboarding";
 import Advice, { type SlotStatus } from "./components/Advice";
 import Water from "./components/Water";
-import Weights from "./components/Weights";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
@@ -295,8 +294,6 @@ export default function App() {
             />
           )}
         </section>
-
-        <Weights date={date} />
 
         <Water date={date} profile={profile} />
       </main>
