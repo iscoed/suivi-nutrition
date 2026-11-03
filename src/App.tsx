@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
 import Onboarding from "./components/Onboarding";
-import Advice from "./components/Advice";
-import Summary from "./components/Summary";
+import Advice, { type SlotStatus } from "./components/Advice";
+import Water from "./components/Water";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
 import { newId, rescale, todayKey, totals, type Entry } from "./lib/journal";
 import { mealComment, sumItems } from "./lib/comment";
+import { daySlots } from "./lib/planning";
 import {
   loadCloudProfile, saveCloudProfile, loadCloudEntries, insertCloudEntries,
   updateCloudEntry, deleteCloudEntry,
@@ -60,6 +61,7 @@ export default function App() {
   const [entries, setEntries] = useState<Entry[]>([]);
 
   const [description, setDescription] = useState("");
+  const [slot, setSlot] = useState<string>("breakfast");
   const [pending, setPending] = useState<FoodItem[]>([]);
   const [questions, setQuestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -98,6 +100,8 @@ export default function App() {
     );
   }
 
+  const dayDate = new Date(date + "T12:00:00");
+  const daySlotList = daySlots(dayDate);
   const goals = computeGoals(profile);
   const dayEntries = entries.filter((e) => e.date === date);
   const eaten = totals(dayEntries);
@@ -109,6 +113,10 @@ export default function App() {
     carbs_g: Math.max(0, Math.round(goals.carbs_g - eaten.carbs)),
     fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
   };
+  const slotStatus: SlotStatus[] = daySlotList.map((s) => {
+    const list = dayEntries.filter((e) => e.slot === s.key);
+    return { key: s.key, label: s.label, time: s.time, done: list.length > 0, eaten: totals(list) };
+  });
 
   async function analyze() {
     setLoading(true);
@@ -128,7 +136,7 @@ export default function App() {
 
   async function addToJournal() {
     if (pending.length === 0) return;
-    const list: Entry[] = pending.map((p) => ({ ...p, id: newId(), date }));
+    const list: Entry[] = pending.map((p) => ({ ...p, id: newId(), date, slot }));
     try {
       await insertCloudEntries(list);
       setEntries([...entries, ...list]);
@@ -185,10 +193,17 @@ export default function App() {
 
       <section className="space-y-2">
         <h2 className="font-semibold">Ajouter ce que vous avez mangé</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <select className="rounded border p-2 text-sm" value={slot} onChange={(e) => setSlot(e.target.value)}>
+            {daySlotList.map((s) => (
+              <option key={s.key} value={s.key}>{s.label} · {s.time}</option>
+            ))}
+          </select>
+        </div>
         <textarea
           className="w-full rounded border p-3"
           rows={4}
-          placeholder="Ex. ce matin 4 oeufs, 170 g de riz basmati ; midi 40 g de poulet"
+          placeholder="Ex. 4 oeufs, 170 g de riz basmati, un peu d'huile d'olive"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -218,7 +233,7 @@ export default function App() {
           <p className="text-sm">
             Total : {Math.round(pendingTotal.calories)} kcal · P {Math.round(pendingTotal.proteins)} g · G {Math.round(pendingTotal.carbs)} g · L {Math.round(pendingTotal.fats)} g
           </p>
-          <button onClick={addToJournal} className="rounded bg-green-600 px-4 py-2 text-white">Ajouter au journal du {date}</button>
+          <button onClick={addToJournal} className="rounded bg-green-600 px-4 py-2 text-white">Ajouter au journal</button>
         </section>
       )}
 
@@ -239,9 +254,7 @@ export default function App() {
         <Stat label="Lipides" eaten={eaten.fats} goal={goals.fat_g} unit="g" />
       </section>
 
-      <Advice remaining={remaining} />
-
-      <Summary date={date} profile={profile} remaining={remaining} />
+      <Advice slots={slotStatus} remaining={remaining} />
 
       <section className="space-y-3">
         <h2 className="font-semibold">Repas du {date}</h2>
@@ -257,6 +270,8 @@ export default function App() {
           />
         )}
       </section>
+
+      <Water date={date} profile={profile} />
     </main>
   );
 }

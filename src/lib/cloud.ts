@@ -46,6 +46,7 @@ export async function loadCloudEntries(): Promise<Entry[]> {
     fats_g: Number(r.fats_g),
     confidence: r.confidence ?? "low",
     assumption: r.assumption ?? "",
+    slot: r.slot ?? undefined,
   })) as Entry[];
 }
 

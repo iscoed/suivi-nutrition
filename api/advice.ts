@@ -1,39 +1,29 @@
 const SYSTEM_PROMPT = `Tu es un coach nutritionnel motivant, avec une touche d'humour de temps en temps. Tu écris en français.
 
-Réponds UNIQUEMENT avec les lignes suivantes, sans rien d'autre :
-CONSEIL: une phrase d'encouragement ou d'analyse.
-PROPOSITION: titre court | aliment 1 : quantité g ; aliment 2 : quantité g | raison courte
-PROPOSITION: titre court | aliment 1 : quantité g ; aliment 2 : quantité g | raison courte
+Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises markdown.
+
+Schéma exact :
+{"advice":string,"plans":[{"slot":string,"options":[{"title":string,"foods":[{"name":string,"quantity_g":number}],"calories":number,"proteins_g":number,"carbs_g":number,"fats_g":number}]}]}
 
 Règles :
-- Ne propose pas plus que ce qui reste dans la journée, et équilibre protéines, glucides et lipides.
-- Quand un nutriment manque, propose des équivalences courantes (ex. 30 g de protéines : 200 g de poulet cuit, ou 4 œufs + 150 g de fromage blanc).
+- Tu reçois les moments à venir (slot = clé) et le reste total de la journée.
+- Répartis le reste entre les moments à venir. La somme des calories proposées ne doit pas dépasser le reste total.
+- Pour chaque moment à venir, propose 2 ou 3 options, avec leurs quantités et leurs valeurs calculées pour ces quantités.
+- Les valeurs doivent être cohérentes (ex. 150 g de poulet cuit ≈ 165 kcal, 33 g de protéines).
+- Équilibre protéines, glucides et lipides. Si les lipides restants sont faibles, propose des options maigres.
 - Au dîner : riz 50 g max, poulet 100 g max, bœuf 80 g max, poisson 80 g max. Les légumes sont libres.
-- Si beaucoup de lipides sont déjà consommés, propose une option plus maigre.
-- Ne propose jamais de restriction. Si le reste est faible, dis que la journée est bien remplie.
+- Ne propose jamais de restriction. Si le reste est faible, dis-le dans advice avec de l'humour, sans conseiller de sauter un repas.
+- "advice" : une phrase motivante ou drôle sur la journée.
 - Ce sont des conseils généraux, pas un avis médical.`;
 
 const MODEL = "openai/gpt-oss-20b";
 
-function parseText(text: string) {
-  const advice = text.match(/CONSEIL\s*:\s*(.+)/i)?.[1]?.trim() ?? "";
-  const suggestions = [...text.matchAll(/PROPOSITION\s*\d*\s*:\s*(.+)/gi)].map((m) => {
-    const [title = "Proposition", foods = "", reason = ""] = m[1].split("|").map((s) => s.trim());
-    const items = foods
-      .split(";")
-      .map((f) => f.trim())
-      .filter(Boolean)
-      .map((f) => {
-        const [name, qty] = f.split(":").map((s) => s.trim());
-        return {
-          name: name || f,
-          quantity_g: Number((qty ?? "").replace(/[^\d.,]/g, "").replace(",", ".")) || 0,
-        };
-      });
-    return { title, foods: items, reason };
-  });
-  if (!advice && suggestions.length === 0) throw new Error("format inattendu");
-  return { advice, suggestions };
+function parseJson(text: string) {
+  const clean = text.replace(/```json|```/g, "").trim();
+  const start = clean.indexOf("{");
+  const end = clean.lastIndexOf("}");
+  if (start === -1 || end === -1) throw new Error("pas de JSON");
+  return JSON.parse(clean.slice(start, end + 1));
 }
 
 async function callGroq(context: string, temperature: number) {
@@ -59,18 +49,20 @@ async function callGroq(context: string, temperature: number) {
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { moment, remaining, dinner, alternative } = req.body ?? {};
-  if (typeof moment !== "string" || !remaining) {
+  const { slots, remaining, alternative } = req.body ?? {};
+  if (!Array.isArray(slots) || !remaining) {
     return res.status(400).json({ error: "Données manquantes" });
   }
+  if (slots.length === 0) {
+    return res.status(200).json({ advice: "Journée complète, bravo !", plans: [] });
+  }
 
-  const context = `Moment : ${moment}
-Reste à consommer aujourd'hui : ${JSON.stringify(remaining)}
-Dîner prévu : ${dinner ? "oui" : "non"}
-${alternative ? "L'utilisateur demande une proposition différente de la précédente." : ""}`;
+  const context = `Moments à venir : ${JSON.stringify(slots)}
+Reste total de la journée : ${JSON.stringify(remaining)}
+${alternative ? "L'utilisateur veut des propositions différentes des précédentes." : ""}`;
 
   let lastText = "";
-  for (const temperature of [0.5, 0.9]) {
+  for (const temperature of [alternative ? 0.9 : 0.5, 0.9]) {
     const apiRes = await callGroq(context, temperature);
     if (!apiRes.ok) {
       const detail = await apiRes.text();
@@ -79,15 +71,16 @@ ${alternative ? "L'utilisateur demande une proposition différente de la précé
     const data = await apiRes.json();
     lastText = data.choices?.[0]?.message?.content ?? "";
     try {
-      return res.status(200).json(parseText(lastText));
+      const parsed = parseJson(lastText);
+      if (Array.isArray(parsed.plans)) return res.status(200).json(parsed);
     } catch {
-      // Nouvelle tentative
+      // nouvelle tentative
     }
   }
 
   return res.status(200).json({
-    advice: "Le coach fait une pause café. Réessayez dans un instant, ou cliquez sur Alternatives.",
-    suggestions: [],
+    advice: "Le coach fait une pause café. Cliquez sur Alternatives dans un instant.",
+    plans: [],
     debug_raw: lastText.slice(0, 500),
   });
 }

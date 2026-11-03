@@ -2,7 +2,7 @@ import type { Confidence } from "./types";
 
 export interface Entry {
   id: string;
-  date: string; // AAAA-MM-JJ
+  date: string;
   name: string;
   quantity_g: number;
   calories: number;
@@ -11,6 +11,7 @@ export interface Entry {
   fats_g: number;
   confidence: Confidence;
   assumption: string;
+  slot?: string;
 }
 
 const KEY = "suivi-nutrition-journal";
