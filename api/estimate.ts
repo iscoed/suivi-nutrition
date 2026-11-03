@@ -149,16 +149,30 @@ function plainText(html: string): string {
 
 function parseProductPage(html: string) {
   const text = plainText(html);
-  const get = (re: RegExp) => { const m = text.match(re); return m ? num(m[1]) : null; };
-  const kcal = get(/Énergie \(kcal\)\s*:\s*([\d.,]+)/i);
-  const proteins = get(/Protéines? \(g\)\s*:\s*([\d.,]+)/i);
-  const carbs = get(/Glucides \(g\)\s*:\s*([\d.,]+)/i);
-  const fats = get(/Matières grasses \(g\)\s*:\s*([\d.,]+)/i);
+  const grab = (re: RegExp) => {
+    const m = text.match(re);
+    return m ? num(m[1]) : null;
+  };
+
+  // Format tableau : "Énergie (kcal) : 370" ; format fiche : "Énergie 58 kcal"
+  const kcal = grab(/Énergie \(kcal\)\s*:\s*([\d.,]+)/i) ?? grab(/Énergie\s+([\d.,]+)\s*kcal/i);
+  const proteins = grab(/Protéines? \(g\)\s*:\s*([\d.,]+)/i) ?? grab(/Protéines?\s+([\d.,]+)\s*g\b/i);
+  const carbs = grab(/Glucides \(g\)\s*:\s*([\d.,]+)/i) ?? grab(/Glucides\s+([\d.,]+)\s*g\b/i);
+  const fats = grab(/Matières grasses \(g\)\s*:\s*([\d.,]+)/i) ?? grab(/Matières grasses\s+([\d.,]+)\s*g\b/i);
   if (kcal === null || proteins === null || carbs === null || fats === null) return null;
+
+  // Quantité du produit : "Contenance 240 ml", sinon "60 grammes" dans le tableau
+  const contenance = text.match(/Contenance\s+(\d+(?:[.,]\d+)?)\s*(?:ml|g)\b/i);
   const idx = text.search(/Valeurs nutritionnelles/i);
   const after = idx >= 0 ? text.slice(idx) : text;
-  const portion = [...after.matchAll(/(\d+(?:[.,]\d+)?)\s*grammes\b/gi)].map((m) => num(m[1])).find((v) => v !== 100) ?? null;
-  const title = (html.match(/<title>([^<]+)<\/title>/i)?.[1] ?? "").trim();
+  const portionGrammes =
+    [...after.matchAll(/(\d+(?:[.,]\d+)?)\s*grammes\b/gi)]
+      .map((m) => num(m[1]))
+      .find((v) => v !== 100) ?? null;
+  const portion = contenance ? num(contenance[1]) : portionGrammes;
+
+  const title = (text.match(/Boisson|Barre|Protéine|Snack/i) ? "" : "") ||
+    (html.match(/<title>([^<]+)<\/title>/i)?.[1] ?? "").trim();
   return { title, per100: { kcal, proteins, carbs, fats }, portion };
 }
 
