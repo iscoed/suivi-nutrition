@@ -1,3 +1,4 @@
+import Weights from "./components/Weights";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -294,7 +295,7 @@ export default function App() {
             />
           )}
         </section>
-
+        <Weights date={date} />
         <Water date={date} profile={profile} />
       </main>
     </div>
