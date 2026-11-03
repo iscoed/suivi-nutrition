@@ -5,21 +5,20 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour, sans balises m
 Schéma exact :
 {"items":[{"name":string,"quantity_g":number,"calories":number,"proteins_g":number,"carbs_g":number,"fats_g":number,"state":"raw"|"cooked"|"unknown","confidence":"high"|"medium"|"low","assumption":string}],"clarifying_questions":[string]}
 
-Règles essentielles :
-- Découpe la phrase en aliments distincts. Chaque aliment a ses propres valeurs.
-- Si le contenu d'une page produit est fourni, utilise ses valeurs "pour 100 g" : valeur × quantité mangée / 100.
-- Si la page indique une portion en grammes (ex. "60 grammes") et que l'utilisateur dit "1 barre" ou "une portion", utilise cette portion comme quantité_g, et écris "Portion de la page : 60 g" dans assumption.
-- Ne mets JAMAIS 0 pour une valeur si elle figure dans le contenu fourni.
-- N'invente aucune valeur absente du contenu. Si aucune valeur n'est lisible, renvoie "items":[] et demande de coller le tableau nutritionnel.
-- Les valeurs correspondent à la quantité mangée, pas à 100 g, sauf si la quantité est 100 g.
+Règles :
+- Découpe la phrase en aliments distincts. Chaque aliment a ses propres valeurs pour la quantité indiquée.
+- Si la quantité n'est pas précisée, estime une portion courante et écris-la dans assumption.
+- N'invente pas de marque ni de valeurs de produit emballé.
 - Distingue poids cru et poids cuit. Si ce n'est pas précisé et que cela change fortement les valeurs, mets state="unknown" et pose une question.
 - Ce sont des estimations. Pas de conseil médical.
 - Si le message ne décrit pas de repas, renvoie {"items":[],"clarifying_questions":["Pouvez-vous décrire ce que vous avez mangé ?"]}.`;
 
 const MODEL = "openai/gpt-oss-20b";
-
 const TRACKING = /^(utm_|gclid|gad_|gbraid|wbraid|fbclid|srsltid)/i;
 const URL_RE = /https?:\/\/[^\s]+/i;
+
+const num = (s: string) => Number(s.replace(",", "."));
+const round1 = (v: number) => Math.round(v * 10) / 10;
 
 function cleanUrl(raw: string): URL | null {
   try {
@@ -34,12 +33,6 @@ function cleanUrl(raw: string): URL | null {
   }
 }
 
-function nameFromUrl(u: URL): string {
-  const last = u.pathname.split("/").filter(Boolean).pop() ?? "";
-  return decodeURIComponent(last).replace(/[-_]+/g, " ").trim();
-}
-
-// Texte brut de la page, sans scripts, styles ni balises
 function plainText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -52,28 +45,29 @@ function plainText(html: string): string {
     .replace(/\s+/g, " ");
 }
 
-// Extrait la zone utile : titre, tableau nutritionnel et portion, sans les menus
-function extractUseful(html: string): string | null {
+// Lit le tableau "pour 100 g" et la portion sur la page produit
+function parseProductPage(html: string) {
   const text = plainText(html);
+  const get = (re: RegExp) => {
+    const m = text.match(re);
+    return m ? num(m[1]) : null;
+  };
+  const kcal = get(/Énergie \(kcal\)\s*:\s*([\d.,]+)/i);
+  const proteins = get(/Protéines? \(g\)\s*:\s*([\d.,]+)/i);
+  const carbs = get(/Glucides \(g\)\s*:\s*([\d.,]+)/i);
+  const fats = get(/Matières grasses \(g\)\s*:\s*([\d.,]+)/i);
+  if (kcal === null || proteins === null || carbs === null || fats === null) return null;
 
-  const title = html.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim() ?? "";
-
-  let nutrition = "";
   const idx = text.search(/Valeurs nutritionnelles/i);
-  if (idx >= 0) {
-    nutrition = text.slice(idx, idx + 1000);
-  } else {
-    const kcal = text.search(/kcal/i);
-    if (kcal >= 0) nutrition = text.slice(Math.max(0, kcal - 300), kcal + 700);
-  }
+  const after = idx >= 0 ? text.slice(idx) : text;
+  const portionMatch = after.match(/(\d+(?:[.,]\d+)?)\s*(?:grammes|g)\b/i);
+  const portion = portionMatch ? num(portionMatch[1]) : null;
 
-  const portion = text.match(/[^.]{0,30}\b\d+\s*(?:grammes|g)\b[^.]{0,30}/i)?.[0]?.trim() ?? "";
-
-  if (!nutrition) return null;
-  return `Titre : ${title}\n${nutrition}\nPortion indiquée : ${portion}`;
+  const title = (html.match(/<title>([^<]+)<\/title>/i)?.[1] ?? "").trim();
+  return { title, per100: { kcal, proteins, carbs, fats }, portion };
 }
 
-async function fetchProductPage(url: string): Promise<string | null> {
+async function fetchHtml(url: string): Promise<string | null> {
   try {
     const r = await fetch(url, {
       headers: {
@@ -82,31 +76,10 @@ async function fetchProductPage(url: string): Promise<string | null> {
       },
       redirect: "follow",
     });
-    if (!r.ok) return null;
-    return extractUseful(await r.text());
+    return r.ok ? await r.text() : null;
   } catch {
     return null;
   }
-}
-
-async function callGroq(content: string) {
-  return fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 2500,
-      temperature: 0.1,
-    }),
-  });
 }
 
 function parseJson(text: string) {
@@ -117,6 +90,39 @@ function parseJson(text: string) {
   return JSON.parse(clean.slice(start, end + 1));
 }
 
+// Appel au modèle pour le texte libre (les autres aliments)
+async function askModel(content: string) {
+  let lastText = "";
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const apiRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 2500,
+        temperature: 0.1,
+      }),
+    });
+    if (!apiRes.ok) throw new Error(`IA ${apiRes.status}: ${await apiRes.text()}`);
+    const data = await apiRes.json();
+    lastText = data.choices?.[0]?.message?.content ?? "";
+    try {
+      return parseJson(lastText);
+    } catch {
+      // nouvelle tentative
+    }
+  }
+  throw new Error(`Réponse IA mal formée: ${lastText.slice(0, 200)}`);
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== "POST") return res.status(405).end();
 
@@ -125,39 +131,59 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: "Description invalide" });
   }
 
-  let content = description;
-  const found = description.match(URL_RE);
-  if (found) {
-    content = description.replace(found[0], "[lien produit]");
-    const u = cleanUrl(found[0]);
-    if (u) {
-      const page = await fetchProductPage(u.toString());
-      content += page
-        ? `\n\nContenu de la page produit (${u.toString()}) :\n${page}`
-        : `\n\nNom du produit déduit du lien : "${nameFromUrl(u)}". Le tableau nutritionnel n'a pas pu être lu : demande de le coller.`;
-    }
-  }
+  const items: any[] = [];
+  const questions: string[] = [];
+  let rest = description;
 
-  let lastDetail = "";
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    const apiRes = await callGroq(content);
+  try {
+    const urlMatch = description.match(URL_RE);
+    if (urlMatch) {
+      rest = description.replace(urlMatch[0], " ");
+      const u = cleanUrl(urlMatch[0]);
+      const html = u ? await fetchHtml(u.toString()) : null;
+      const product = html ? parseProductPage(html) : null;
 
-    if (!apiRes.ok) {
-      lastDetail = await apiRes.text();
-      if (apiRes.status !== 400 || !lastDetail.includes("json_validate_failed")) {
-        return res.status(502).json({ error: "Service IA indisponible", status: apiRes.status, detail: lastDetail });
+      if (product) {
+        // Quantité : celle écrite en grammes par l'utilisateur, sinon la portion de la page
+        const userG = rest.match(/(\d+(?:[.,]\d+)?)\s*(?:g|grammes)\b/i);
+        const qty = userG ? num(userG[1]) : product.portion;
+        if (!qty) {
+          questions.push("Quelle quantité avez-vous mangée (en grammes ou en nombre de barres) ?");
+        } else {
+          const f = qty / 100;
+          const p = product.per100;
+          items.push({
+            name: product.title || "Produit",
+            quantity_g: qty,
+            calories: Math.round(p.kcal * f),
+            proteins_g: round1(p.proteins * f),
+            carbs_g: round1(p.carbs * f),
+            fats_g: round1(p.fats * f),
+            state: "unknown",
+            confidence: "high",
+            assumption: `Valeurs de la page produit (pour 100 g) × ${qty} g`,
+          });
+        }
+      } else {
+        questions.push("Je n'arrive pas à lire le tableau nutritionnel de ce site. Collez-le dans votre message, ou tapez les valeurs.");
       }
-      continue;
     }
 
-    const data = await apiRes.json();
-    const text: string = data.choices?.[0]?.message?.content ?? "";
-    try {
-      return res.status(200).json(parseJson(text));
-    } catch {
-      lastDetail = text;
+    // Le reste du texte (autres aliments) passe par l'IA, sans la barre déjà traitée
+    const restForModel = rest
+      .replace(/j[’']ai mang[ée]/gi, " ")
+      .replace(/(?:une?|1)\s*(?:barres?|portions?)/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (restForModel.replace(/[^a-zA-Zà-ÿ]/g, "").length >= 4) {
+      const out = await askModel(restForModel);
+      if (Array.isArray(out.items)) items.push(...out.items);
+      if (Array.isArray(out.clarifying_questions)) questions.push(...out.clarifying_questions);
     }
+
+    return res.status(200).json({ items, clarifying_questions: questions });
+  } catch (e) {
+    return res.status(502).json({ error: "Service IA indisponible", detail: (e as Error).message });
   }
-
-  return res.status(502).json({ error: "Réponse IA mal formée", detail: lastDetail.slice(0, 300) });
 }
