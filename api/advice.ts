@@ -14,8 +14,7 @@ Règles :
 - Ton motivant et parfois drôle, sans jamais culpabiliser.
 - Ce sont des conseils généraux, pas un avis médical.`;
 
-const MODEL = "llama-3.1-8b-instant";
-
+const MODEL = "openai/gpt-oss-20b";
 const FALLBACK = {
   advice: "Le coach fait une pause café. Réessayez dans un instant, ou cliquez sur Alternatives.",
   suggestions: [],
