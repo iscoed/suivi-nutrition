@@ -1,3 +1,4 @@
+import Advice from "./components/Advice";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -184,7 +185,15 @@ export default function App() {
         <Stat label="Glucides" eaten={eaten.carbs} goal={goals.carbs_g} unit="g" />
         <Stat label="Lipides" eaten={eaten.fats} goal={goals.fat_g} unit="g" />
       </section>
-
+      <Advice
+        remaining={{
+          calories: Math.max(0, Math.round(goals.calories - eaten.calories)),
+          proteins_g: Math.max(0, Math.round(goals.protein_g - eaten.proteins)),
+          carbs_g: Math.max(0, Math.round(goals.carbs_g - eaten.carbs)),
+          fats_g: Math.max(0, Math.round(goals.fat_g - eaten.fats)),
+        }}
+      />
+      
       <section className="space-y-2">
         <h2 className="font-semibold">Ajouter ce que vous avez mangé</h2>
         <textarea
