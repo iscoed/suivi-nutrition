@@ -10,117 +10,62 @@ export default function Auth() {
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-
     setLoading(true);
     setMessage(null);
-
-    try {
-      // Nettoyage de l'adresse e-mail uniquement.
-      // Ne jamais modifier le mot de passe.
-      const normalizedEmail = email.trim();
-
-      const { data, error } =
-        mode === "login"
-          ? await supabase.auth.signInWithPassword({
-              email: normalizedEmail,
-              password,
-            })
-          : await supabase.auth.signUp({
-              email: normalizedEmail,
-              password,
-            });
-
-      if (error) {
-        console.error("SUPABASE AUTH ERROR:", {
-          message: error.message,
-          status: error.status,
-          code: error.code,
-        });
-
-        setMessage(error.message);
-        return;
-      }
-
-      if (mode === "signup" && !data.session) {
-        setMessage(
-          "Compte créé. Vérifiez votre boîte e-mail pour confirmer votre adresse."
-        );
-      }
-    } catch (err) {
-      console.error("AUTH NETWORK ERROR:", err);
-
-      setMessage(
-        err instanceof Error
-          ? err.message
-          : "Une erreur inattendue est survenue. Réessayez."
-      );
-    } finally {
-      setLoading(false);
-    }
+    const { error } =
+      mode === "login"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+    setLoading(false);
+    if (error) setMessage(error.message);
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="mx-auto max-w-sm space-y-4 p-6"
-    >
-      <h1 className="text-2xl font-bold">
-        {mode === "login" ? "Connexion" : "Créer un compte"}
-      </h1>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-4">
+      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-8 shadow-xl">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">Suivi nutrition</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {mode === "login" ? "Connectez-vous à votre espace" : "Créez votre espace personnel"}
+          </p>
+        </div>
 
-      <input
-        className="w-full rounded border p-2"
-        type="email"
-        placeholder="E-mail"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        autoComplete="username"
-        required
-      />
+        <input
+          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          type="email"
+          placeholder="E-mail"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          type="password"
+          placeholder="Mot de passe (6 caractères minimum)"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={6}
+          required
+        />
 
-      <input
-        className="w-full rounded border p-2"
-        type="password"
-        placeholder="Mot de passe (6 caractères minimum)"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        autoComplete={
-          mode === "login" ? "current-password" : "new-password"
-        }
-        minLength={6}
-        required
-      />
+        {message && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-600">{message}</p>}
 
-      {message && (
-        <p className="text-sm text-red-600 break-words" role="alert">
-          {message}
-        </p>
-      )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-full bg-emerald-600 py-3 font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {loading ? "Patientez…" : mode === "login" ? "Se connecter" : "Créer mon compte"}
+        </button>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded bg-green-600 px-4 py-2 text-white disabled:opacity-50"
-      >
-        {loading
-          ? "Patientez…"
-          : mode === "login"
-          ? "Se connecter"
-          : "Créer mon compte"}
-      </button>
-
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "login" ? "signup" : "login");
-          setMessage(null);
-        }}
-        className="w-full text-sm text-green-700 underline"
-      >
-        {mode === "login"
-          ? "Pas encore de compte ? Créer un compte"
-          : "J'ai déjà un compte"}
-      </button>
-    </form>
+        <button
+          type="button"
+          onClick={() => setMode(mode === "login" ? "signup" : "login")}
+          className="w-full text-sm font-medium text-emerald-700 hover:underline"
+        >
+          {mode === "login" ? "Pas encore de compte ? Créer un compte" : "J'ai déjà un compte"}
+        </button>
+      </form>
+    </div>
   );
 }
