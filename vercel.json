@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/estimate.ts": {
+      "includeFiles": "src/data/foods.json"
+    }
+  }
+}
