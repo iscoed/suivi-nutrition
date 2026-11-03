@@ -8,31 +8,36 @@ Schéma exact :
 Règles essentielles :
 - Découpe la phrase en aliments distincts. Chaque aliment a ses propres valeurs.
 - Si l'utilisateur donne les valeurs d'un produit, utilise ces valeurs et calcule pour la quantité indiquée.
-- Ne prétends jamais connaître une quantité exacte. Si la portion est estimée, mets confidence="low" ou "medium".
-- Distingue poids cru et poids cuit. Si ce n'est pas précisé et que cela change fortement les valeurs, mets state="unknown" et pose une question dans clarifying_questions.
+- Si la quantité d'un produit emballé n'est pas précisée, prends une unité (1 barre, 1 portion) et écris-le dans assumption.
+- Si un "Contenu de la page produit" est fourni, utilise uniquement ce contenu pour les valeurs. N'invente jamais de valeurs qui ne figurent pas dans ce contenu.
+- Si la page n'a pas pu être lue, tu peux estimer à partir du nom du produit : mets confidence="low" et assumption="Valeurs estimées à partir du nom, à vérifier sur l'emballage", et demande dans clarifying_questions de coller le tableau nutritionnel.
 - Les valeurs correspondent à la quantité indiquée, pas à 100 g, sauf si la quantité est 100 g.
-- Si un "Contenu de la page produit" est fourni, utilise uniquement ce contenu pour le nom du produit et ses valeurs. N'invente jamais de valeurs : si elles ne figurent pas dans le contenu, mets 0, confidence="low" et demande dans clarifying_questions de coller le tableau nutritionnel.
-- Si l'utilisateur ne précise pas la quantité d'un produit, prends la portion indiquée sur la page et écris-la dans assumption.
-- Les valeurs des pages produit sont souvent pour 100 g ou pour une portion : calcule pour la quantité réellement mangée et indique la base utilisée dans assumption.
+- Distingue poids cru et poids cuit. Si ce n'est pas précisé et que cela change fortement les valeurs, mets state="unknown" et pose une question.
 - Ce sont des estimations. Pas de conseil médical.
 - Si le message ne décrit pas de repas, renvoie {"items":[],"clarifying_questions":["Pouvez-vous décrire ce que vous avez mangé ?"]}.`;
 
 const MODEL = "openai/gpt-oss-20b";
 
-const TRACKING = /^(utm_|gclid|gad_|gbraid|wbraid|fbclid)/i;
+const TRACKING = /^(utm_|gclid|gad_|gbraid|wbraid|fbclid|srsltid)/i;
 const URL_RE = /https?:\/\/[^\s]+/i;
 
-function cleanUrl(raw: string): string | null {
+function cleanUrl(raw: string): URL | null {
   try {
     const u = new URL(raw);
     if (!["http:", "https:"].includes(u.protocol)) return null;
     for (const key of [...u.searchParams.keys()]) {
       if (TRACKING.test(key)) u.searchParams.delete(key);
     }
-    return u.toString();
+    return u;
   } catch {
     return null;
   }
+}
+
+// Déduit un nom de produit à partir de l'adresse : /products/pro-dome-bar-salted-caramel -> "pro dome bar salted caramel"
+function nameFromUrl(u: URL): string {
+  const last = u.pathname.split("/").filter(Boolean).pop() ?? "";
+  return decodeURIComponent(last).replace(/[-_]+/g, " ").trim();
 }
 
 function htmlToText(html: string): string {
@@ -61,7 +66,9 @@ async function fetchProductPage(url: string): Promise<string | null> {
       redirect: "follow",
     });
     if (!r.ok) return null;
-    return htmlToText(await r.text());
+    const text = htmlToText(await r.text());
+    // Une page qui contient moins de 300 caractères utiles n'a pas de valeurs lisibles
+    return text.length >= 300 ? text : null;
   } catch {
     return null;
   }
@@ -103,17 +110,17 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: "Description invalide" });
   }
 
-  // Si la phrase contient un lien, on lit la page produit et on l'ajoute au contexte
   let content = description;
   const found = description.match(URL_RE);
   if (found) {
     content = description.replace(found[0], "[lien produit]");
-    const clean = cleanUrl(found[0]);
-    if (clean) {
-      const pageText = await fetchProductPage(clean);
+    const u = cleanUrl(found[0]);
+    if (u) {
+      const name = nameFromUrl(u);
+      const pageText = await fetchProductPage(u.toString());
       content += pageText
-        ? `\n\nContenu de la page produit (${clean}) :\n${pageText}`
-        : `\n\nLe lien produit n'a pas pu être lu. Demande à l'utilisateur de coller le tableau nutritionnel dans clarifying_questions.`;
+        ? `\n\nContenu de la page produit (${u.toString()}) :\n${pageText}`
+        : `\n\nNom du produit déduit du lien : "${name}". Le contenu de la page n'a pas pu être lu.`;
     }
   }
 
