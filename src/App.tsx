@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -109,6 +110,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastComment, setLastComment] = useState<string | null>(null);
+    const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(!!data.session));
@@ -168,6 +170,7 @@ export default function App() {
       const out = await estimateMeal(description);
       setPending(out.items);
       setQuestions(out.questions);
+            setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
       if (out.items.length === 0 && out.questions.length === 0) setError("Aucun aliment reconnu. Précisez votre repas.");
     } catch (e) {
       setError((e as Error).message);
@@ -219,11 +222,13 @@ export default function App() {
     setPending(items);
     setQuestions(qs);
     setError(null);
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }
 
   const pendingBlock = pending.length > 0 && (
+    <div ref={resultRef}>
     <section className={card}>
-      <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
+            <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">Ajouter à quel moment ?</label>
