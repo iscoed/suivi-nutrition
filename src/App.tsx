@@ -1,3 +1,4 @@
+import MealBuilder from "./components/MealBuilder";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -257,6 +258,14 @@ export default function App() {
           onResult={(items, qs) => {
             setPending(items);
             setQuestions(qs);
+            setError(null);
+          }}
+        />
+
+        <MealBuilder
+          onPick={(items) => {
+            setPending(items);
+            setQuestions([]);
             setError(null);
           }}
         />
