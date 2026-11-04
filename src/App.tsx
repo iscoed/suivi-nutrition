@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -34,7 +33,6 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "profile", label: "Profil", icon: "👤" },
 ];
 
-// Image d'en-tête selon l'onglet
 const TAB_IMAGE: Record<Tab, string> = {
   home: "accueil.jpg",
   meals: "repas.jpg",
@@ -110,7 +108,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastComment, setLastComment] = useState<string | null>(null);
-    const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(!!data.session));
@@ -126,6 +123,13 @@ export default function App() {
       setLoaded(true);
     })().catch((e) => setError((e as Error).message));
   }, [session]);
+
+  // Dès qu'un résultat arrive, on descend vers la section de vérification
+  useEffect(() => {
+    if (pending.length > 0) {
+      document.getElementById("resultat")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [pending.length]);
 
   if (session === null) return <p className="p-6 text-gray-500">Chargement…</p>;
   if (!session) return <Auth />;
@@ -170,7 +174,6 @@ export default function App() {
       const out = await estimateMeal(description);
       setPending(out.items);
       setQuestions(out.questions);
-            setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
       if (out.items.length === 0 && out.questions.length === 0) setError("Aucun aliment reconnu. Précisez votre repas.");
     } catch (e) {
       setError((e as Error).message);
@@ -222,13 +225,11 @@ export default function App() {
     setPending(items);
     setQuestions(qs);
     setError(null);
-        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   }
 
   const pendingBlock = pending.length > 0 && (
-    <div ref={resultRef}>
-    <section className={card}>
-            <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
+    <section id="resultat" className={`${card} scroll-mt-28`}>
+      <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
 
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700">Ajouter à quel moment ?</label>
@@ -246,6 +247,7 @@ export default function App() {
         onField={(i, field, v) => updatePending(i, { [field]: v } as Partial<FoodItem>)}
         onDelete={(i) => setPending(pending.filter((_, idx) => idx !== i))}
       />
+
       <div className="mt-4 flex flex-col gap-3 rounded-xl bg-gray-50 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <span>
           Total : <b>{Math.round(pendingTotal.calories)} kcal</b> · P {Math.round(pendingTotal.proteins)} g · G {Math.round(pendingTotal.carbs)} g · L {Math.round(pendingTotal.fats)} g
@@ -259,7 +261,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#f5f7f4] pb-28 text-gray-800">
-                 <header
+      <header
         className="sticky top-0 z-30 overflow-hidden bg-cover bg-center px-4 pb-4 pt-4 text-white shadow-md"
         style={{ backgroundImage: `url(/images/${TAB_IMAGE[tab]})` }}
       >
@@ -281,7 +283,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-4 px-3 pt-4 sm:px-4">
-                {tab === "home" && (
+        {tab === "home" && (
           <>
             <section className={card}>
               <p className="text-sm italic text-gray-600">« {proverbOfDay()} »</p>
@@ -465,7 +467,7 @@ function EntryTable({ rows, onName, onQty, onField, onDelete, withIds }: TablePr
   return (
     <div className="-mx-1 overflow-x-auto">
       <table className="w-full text-xs sm:text-sm">
-                <thead>
+        <thead>
           <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">
             <th className="py-2 pr-2">Aliment</th>
             <th className="px-1 py-2 text-right">g</th>
@@ -483,7 +485,7 @@ function EntryTable({ rows, onName, onQty, onField, onDelete, withIds }: TablePr
               <tr key={id ?? i} className={`border-b border-gray-100 align-top ${r.confidence === "low" ? "bg-amber-50" : ""}`}>
                 <td className="py-2 pr-2">
                   <input
-                    className="w-full min-w-[7rem] rounded-md border border-transparent px-1 py-0.5 outline-none hover:border-gray-200 focus:border-emerald-500"
+                    className="w-full rounded-md border border-transparent px-1 py-0.5 outline-none hover:border-gray-200 focus:border-emerald-500"
                     defaultValue={r.name}
                     onBlur={(e) => onName(i, e.target.value, id)}
                   />
