@@ -50,8 +50,13 @@ export default function Onboarding({ initial, onDone }: Props) {
 
         <div>
           <span className={label}>Prénom</span>
-          <input className={field} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="ex. Chouaib" />
-        </div>
+          <input
+            className={field}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="Votre prénom"
+            autoComplete="off"
+          />        </div>
 
         <div>
           <span className={label}>Sexe</span>
