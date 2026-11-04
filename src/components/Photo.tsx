@@ -43,7 +43,7 @@ export default function Photo({ onResult }: Props) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(`${data.error ?? "Photo indisponible"} : ${String(data.detail ?? "").slice(0, 300)}`);
-            onResult(data.items ?? [], data.clarifying_questions ?? []);
+      onResult(data.items ?? [], data.clarifying_questions ?? []);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -51,13 +51,18 @@ export default function Photo({ onResult }: Props) {
     }
   }
 
+  const buttonClass = `cursor-pointer rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 ${
+    busy ? "pointer-events-none opacity-50" : ""
+  }`;
+
   return (
     <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
       <h2 className="mb-2 font-semibold">Photo de l'emballage</h2>
       <p className="mb-4 text-sm text-gray-500">
         Photographiez le tableau nutritionnel. Indiquez la quantité mangée si elle n'est pas sur l'emballage.
       </p>
-      <div className="flex flex-wrap items-center gap-3">
+
+      <div className="mb-3">
         <input
           type="number"
           inputMode="decimal"
@@ -66,15 +71,20 @@ export default function Photo({ onResult }: Props) {
           onChange={(e) => setQty(e.target.value)}
           className="w-44 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-500"
         />
-        <label
-          className={`cursor-pointer rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 ${
-            busy ? "pointer-events-none opacity-50" : ""
-          }`}
-        >
-          {busy ? "Lecture…" : "Prendre une photo"}
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <label className={buttonClass}>
+          Prendre une photo
           <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} disabled={busy} />
         </label>
+        <label className={buttonClass}>
+          Choisir dans la galerie
+          <input type="file" accept="image/*" className="hidden" onChange={onFile} disabled={busy} />
+        </label>
       </div>
+
+      {busy && <p className="mt-3 text-sm text-gray-500">Lecture en cours…</p>}
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </section>
   );
