@@ -253,12 +253,12 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f7f4] pb-28 text-gray-800">
-      <header
-        className="relative min-h-[11rem] overflow-hidden bg-cover bg-center bg-no-repeat px-4 pb-8 pt-5 text-white"
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-[#f5f7f4] pb-28 text-gray-800">
+                 <header
+        className="sticky top-0 z-30 overflow-hidden bg-cover bg-center px-4 pb-4 pt-4 text-white shadow-md"
         style={{ backgroundImage: `url(/images/${TAB_IMAGE[tab]})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-700/50 via-emerald-600/35 to-teal-500/30" />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-900/75 via-emerald-800/65 to-emerald-700/55" />
         <div className="relative mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-emerald-50">
@@ -270,13 +270,13 @@ export default function App() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg bg-white/25 px-2 py-1 text-sm text-white outline-none [color-scheme:dark]"
+            className="rounded-full bg-white px-3 py-1 text-sm text-gray-800 shadow outline-none"
           />
         </div>
       </header>
 
-      <main className="mx-auto -mt-6 max-w-2xl space-y-4 px-3 sm:px-4">
-        {tab === "home" && (
+      <main className="mx-auto max-w-2xl space-y-4 px-3 pt-4 sm:px-4">
+                {tab === "home" && (
           <>
             <section className={card}>
               <p className="text-sm italic text-gray-600">« {proverbOfDay()} »</p>
@@ -459,8 +459,8 @@ interface TableProps {
 function EntryTable({ rows, onName, onQty, onField, onDelete, withIds }: TableProps) {
   return (
     <div className="-mx-1 overflow-x-auto">
-      <table className="w-full min-w-[32rem] text-xs sm:text-sm">
-        <thead>
+      <table className="w-full text-xs sm:text-sm">
+                <thead>
           <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">
             <th className="py-2 pr-2">Aliment</th>
             <th className="px-1 py-2 text-right">g</th>
