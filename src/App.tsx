@@ -1,5 +1,3 @@
-import Chat from "./components/Chat";
-import Voice from "./components/Voice";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -10,6 +8,8 @@ import Weights from "./components/Weights";
 import Summary from "./components/Summary";
 import Photo from "./components/Photo";
 import MealBuilder from "./components/MealBuilder";
+import Voice from "./components/Voice";
+import Chat from "./components/Chat";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
@@ -33,9 +33,20 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "profile", label: "Profil", icon: "👤" },
 ];
 
+// Image d'en-tête selon l'onglet
+const TAB_IMAGE: Record<Tab, string> = {
+  home: "accueil.jpg",
+  meals: "repas.jpg",
+  plan: "plan.jpg",
+  track: "suivi.jpg",
+  chat: "accueil.jpg",
+  profile: "accueil.jpg",
+};
+
 const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5";
 const field = "rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
 const btnPrimary = "w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto sm:py-2.5";
+const btnGhost = "text-sm font-medium text-white/90 hover:text-white";
 
 const parseNum = (v: string) => {
   const n = Number(v.replace(",", "."));
@@ -211,7 +222,7 @@ export default function App() {
     setError(null);
   }
 
-    const pendingBlock = pending.length > 0 && (
+  const pendingBlock = pending.length > 0 && (
     <section className={card}>
       <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
 
@@ -244,24 +255,28 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f5f7f4] pb-28 text-gray-800">
-      <header className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 px-4 pb-6 pt-5 text-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+      <header
+        className="relative min-h-[11rem] overflow-hidden bg-cover bg-center bg-no-repeat px-4 pb-8 pt-5 text-white"
+        style={{ backgroundImage: `url(/images/${TAB_IMAGE[tab]})` }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-700/50 via-emerald-600/35 to-teal-500/30" />
+        <div className="relative mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs text-emerald-100">
+            <p className="text-xs text-emerald-50">
               {profile.first_name ? `Bonjour ${profile.first_name} 👋` : "Bonjour 👋"}
             </p>
-            <h1 className="text-lg font-bold">Suivi nutrition</h1>
+            <h1 className="text-lg font-bold drop-shadow">Suivi nutrition</h1>
           </div>
           <input
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg bg-white/20 px-2 py-1 text-sm text-white outline-none [color-scheme:dark]"
+            className="rounded-lg bg-white/25 px-2 py-1 text-sm text-white outline-none [color-scheme:dark]"
           />
         </div>
       </header>
 
-      <main className="mx-auto -mt-3 max-w-2xl space-y-4 px-3 sm:px-4">
+      <main className="mx-auto -mt-6 max-w-2xl space-y-4 px-3 sm:px-4">
         {tab === "home" && (
           <>
             <section className={card}>
@@ -305,7 +320,8 @@ export default function App() {
                 placeholder="Ex. 4 œufs, 170 g de riz basmati, un peu d'huile d'olive"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-              />               <Voice onText={(t) => setDescription((d) => (d ? `${d} ${t}` : t))} />
+              />
+              <Voice onText={(t) => setDescription((d) => (d ? `${d} ${t}` : t))} />
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
                   {loading ? "Analyse…" : "Analyser"}
@@ -361,6 +377,7 @@ export default function App() {
             <Water date={date} profile={profile} />
           </>
         )}
+
         {tab === "chat" && (
           <Chat
             context={{
@@ -374,6 +391,7 @@ export default function App() {
             }}
           />
         )}
+
         {tab === "profile" && (
           <section className={`${card} space-y-4`}>
             <h2 className="font-semibold">Mon profil</h2>
@@ -415,7 +433,7 @@ export default function App() {
             <li key={t.key}>
               <button
                 onClick={() => setTab(t.key)}
-                className={`flex flex-col items-center gap-0.5 px-3 py-2 text-xs ${
+                className={`flex flex-col items-center gap-0.5 px-2 py-2 text-[11px] ${
                   tab === t.key ? "font-semibold text-emerald-700" : "text-gray-500"
                 }`}
               >
