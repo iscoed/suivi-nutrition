@@ -20,28 +20,43 @@ export default async function handler(req: any, res: any) {
   }
   const dataUrl = image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}`;
 
-  const apiRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY ?? ""}`,
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 800,
-      temperature: 0.1,
-    }),
+  const body = JSON.stringify({
+    model: MODEL,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: PROMPT },
+          { type: "image_url", image_url: { url: dataUrl } },
+        ],
+      },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 800,
+    temperature: 0.1,
   });
+
+  let apiRes: Response | null = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    apiRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY ?? ""}`,
+      },
+      body,
+    });
+    // Saturation temporaire : on attend un peu puis on réessaie
+    if (apiRes.status !== 500 && apiRes.status !== 503 && apiRes.status !== 429) break;
+    await new Promise((r) => setTimeout(r, attempt * 2000));
+  }
+
+  if (!apiRes || !apiRes.ok) {
+    return res.status(502).json({
+      error: "Service photo indisponible",
+      detail: apiRes ? (await apiRes.text()).slice(0, 300) : "Aucune réponse",
+    });
+  }
 
   if (!apiRes.ok) {
     return res.status(502).json({ error: "Service photo indisponible", detail: (await apiRes.text()).slice(0, 300) });
