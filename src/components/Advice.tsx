@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { buildPlans } from "../lib/planner";
 import { DINNER_LIMITS } from "../lib/planning";
 
 export interface SlotStatus {
@@ -9,6 +8,16 @@ export interface SlotStatus {
   done: boolean;
   eaten: { calories: number; proteins: number; carbs: number; fats: number };
 }
+
+interface Option {
+  title: string;
+  foods: { name: string; grams: number }[];
+  kcal: number;
+  p: number;
+  c: number;
+  f: number;
+}
+interface Plan { slot: string; options: Option[] }
 
 interface Props {
   slots: SlotStatus[];
@@ -20,12 +29,34 @@ const r0 = (v: number) => Math.round(v).toLocaleString("fr-FR");
 
 export default function Advice({ slots, remaining }: Props) {
   const [offset, setOffset] = useState(-1);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const pending = slots.filter((s) => !s.done);
-  const plans = offset >= 0 ? buildPlans(pending, remaining, offset) : [];
 
-  function next() {
-    setOffset(offset < 0 ? 0 : offset + 1);
+  async function run(nextOffset: number) {
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slots: pending.map((s) => ({ key: s.key })),
+          remaining,
+          offset: nextOffset,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? "Plan indisponible");
+      setPlans(data.plans ?? []);
+      setOffset(nextOffset);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const message =
@@ -40,15 +71,16 @@ export default function Advice({ slots, remaining }: Props) {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-semibold">Plan de la journée</h2>
         <button
-          onClick={next}
-          disabled={pending.length === 0}
+          onClick={() => run(offset < 0 ? 0 : offset + 1)}
+          disabled={loading || pending.length === 0}
           className="w-full rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
         >
-          {offset < 0 ? "Proposer le plan" : "Alternatives"}
+          {loading ? "Calcul…" : offset < 0 ? "Proposer le plan" : "Alternatives"}
         </button>
       </div>
 
       <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>
+      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full min-w-[28rem] text-xs sm:text-sm">
