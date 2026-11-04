@@ -1,4 +1,3 @@
-import MealBuilder from "./components/MealBuilder";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -8,6 +7,7 @@ import Water from "./components/Water";
 import Weights from "./components/Weights";
 import Summary from "./components/Summary";
 import Photo from "./components/Photo";
+import MealBuilder from "./components/MealBuilder";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
@@ -20,10 +20,19 @@ import {
   updateCloudEntry, deleteCloudEntry,
 } from "./lib/cloud";
 
+type Tab = "home" | "meals" | "plan" | "track" | "profile";
+
+const TABS: { key: Tab; label: string; icon: string }[] = [
+  { key: "home", label: "Accueil", icon: "🏠" },
+  { key: "meals", label: "Repas", icon: "🍽️" },
+  { key: "plan", label: "Plan", icon: "📋" },
+  { key: "track", label: "Suivi", icon: "📈" },
+  { key: "profile", label: "Profil", icon: "👤" },
+];
+
 const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5";
 const field = "rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
 const btnPrimary = "w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto sm:py-2.5";
-const btnGhost = "text-sm font-medium text-white/90 hover:text-white";
 
 const parseNum = (v: string) => {
   const n = Number(v.replace(",", "."));
@@ -76,6 +85,7 @@ export default function App() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<Tab>("home");
   const [date, setDate] = useState(todayKey());
   const [entries, setEntries] = useState<Entry[]>([]);
 
@@ -192,143 +202,203 @@ export default function App() {
     setPending(pending.map((p, idx) => (idx === i ? rescale(p, qty) : p)));
   }
 
+  function setPendingFrom(items: FoodItem[], qs: string[] = []) {
+    setPending(items);
+    setQuestions(qs);
+    setError(null);
+  }
+
+  const pendingBlock = pending.length > 0 && (
+    <section className={card}>
+      <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
+      <EntryTable
+        rows={pending}
+        onName={(i, v) => updatePending(i, { name: v })}
+        onQty={(i, v) => rescalePending(i, v)}
+        onField={(i, field, v) => updatePending(i, { [field]: v } as Partial<FoodItem>)}
+        onDelete={(i) => setPending(pending.filter((_, idx) => idx !== i))}
+      />
+      <div className="mt-4 flex flex-col gap-3 rounded-xl bg-gray-50 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <span>
+          Total : <b>{Math.round(pendingTotal.calories)} kcal</b> · P {Math.round(pendingTotal.proteins)} g · G {Math.round(pendingTotal.carbs)} g · L {Math.round(pendingTotal.fats)} g
+        </span>
+        <button onClick={addToJournal} className={btnPrimary}>Ajouter au journal</button>
+      </div>
+    </section>
+  );
+
   return (
-    <div className="min-h-screen bg-[#f5f7f4] pb-16 text-gray-800">
-      <header className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 px-4 pb-14 pt-6 text-white sm:pt-8">
-        <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="min-h-screen bg-[#f5f7f4] pb-28 text-gray-800">
+      <header className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 px-4 pb-6 pt-5 text-white">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm text-emerald-100">
+            <p className="text-xs text-emerald-100">
               {profile.first_name ? `Bonjour ${profile.first_name} 👋` : "Bonjour 👋"}
             </p>
-            <h1 className="text-xl font-bold sm:text-2xl">Suivi nutrition</h1>
-            <p className="mt-2 text-sm italic text-emerald-50">« {proverbOfDay()} »</p>
-            <p className="mt-2 text-sm text-emerald-50">
-              {profile.weight_kg} kg · objectif {profile.target_weight_kg} kg
-              {diffKg > 0 && ` · ${diffKg} kg à perdre`}
-              {diffKg < 0 && ` · ${Math.abs(diffKg)} kg à prendre`}
-              {diffKg === 0 && " · objectif atteint"}
-            </p>
+            <h1 className="text-lg font-bold">Suivi nutrition</h1>
           </div>
-          <div className="flex shrink-0 gap-4">
-            <button onClick={() => setEditing(true)} className={btnGhost}>Profil</button>
-            <button onClick={() => supabase.auth.signOut()} className={btnGhost}>Déconnexion</button>
-          </div>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-lg bg-white/20 px-2 py-1 text-sm text-white outline-none [color-scheme:dark]"
+          />
         </div>
       </header>
 
-      <main className="mx-auto -mt-10 max-w-2xl space-y-4 px-3 sm:space-y-5 sm:px-4">
-        <section className={card}>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <h2 className="font-semibold">Ma journée</h2>
-            <input type="date" className={`${field} w-full sm:w-auto`} value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div className="space-y-4">
-            <Stat label="Calories" eaten={eaten.calories} goal={goals.calories} unit="kcal" color={BAR.kcal} />
-            <Stat label="Protéines" eaten={eaten.proteins} goal={goals.protein_g} unit="g" color={BAR.prot} />
-            <Stat label="Glucides" eaten={eaten.carbs} goal={goals.carbs_g} unit="g" color={BAR.gluc} />
-            <Stat label="Lipides" eaten={eaten.fats} goal={goals.fat_g} unit="g" color={BAR.lip} />
-          </div>
-        </section>
+      <main className="mx-auto -mt-3 max-w-2xl space-y-4 px-3 sm:px-4">
+        {tab === "home" && (
+          <>
+            <section className={card}>
+              <p className="text-sm italic text-gray-600">« {proverbOfDay()} »</p>
+              <p className="mt-2 text-sm text-gray-500">
+                {profile.weight_kg} kg · objectif {profile.target_weight_kg} kg
+                {diffKg > 0 && ` · ${diffKg} kg à perdre`}
+                {diffKg < 0 && ` · ${Math.abs(diffKg)} kg à prendre`}
+                {diffKg === 0 && " · objectif atteint"}
+              </p>
+            </section>
 
-        <section className={card}>
-          <h2 className="mb-3 font-semibold">Ajouter ce que vous avez mangé</h2>
-          <div className="mb-3">
-            <select className={`${field} w-full`} value={slot} onChange={(e) => setSlot(e.target.value)}>
-              {daySlotList.map((s) => (
-                <option key={s.key} value={s.key}>{s.label} · {s.time}</option>
-              ))}
-            </select>
-          </div>
-          <textarea
-            className={`${field} w-full`}
-            rows={4}
-            placeholder="Ex. 4 œufs, 170 g de riz basmati, un peu d'huile d'olive"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
-              {loading ? "Analyse…" : "Analyser"}
-            </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-          </div>
-        </section>
+            <section className={`${card} space-y-4`}>
+              <h2 className="font-semibold">Ma journée</h2>
+              <Stat label="Calories" eaten={eaten.calories} goal={goals.calories} unit="kcal" color={BAR.kcal} />
+              <Stat label="Protéines" eaten={eaten.proteins} goal={goals.protein_g} unit="g" color={BAR.prot} />
+              <Stat label="Glucides" eaten={eaten.carbs} goal={goals.carbs_g} unit="g" color={BAR.gluc} />
+              <Stat label="Lipides" eaten={eaten.fats} goal={goals.fat_g} unit="g" color={BAR.lip} />
+            </section>
 
-        <Photo
-          onResult={(items, qs) => {
-            setPending(items);
-            setQuestions(qs);
-            setError(null);
-          }}
-        />
-
-        <MealBuilder
-          onPick={(items) => {
-            setPending(items);
-            setQuestions([]);
-            setError(null);
-          }}
-        />
-
-        {questions.length > 0 && (
-          <section className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-            <p className="font-semibold">Précisions demandées</p>
-            <ul className="mt-1 list-disc pl-5">{questions.map((q, i) => <li key={i}>{q}</li>)}</ul>
-          </section>
+            {lastComment && (
+              <section className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900 ring-1 ring-emerald-200">
+                <p>{lastComment}</p>
+              </section>
+            )}
+          </>
         )}
 
-        {pending.length > 0 && (
-          <section className={card}>
-            <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
-            <EntryTable
-              rows={pending}
-              onName={(i, v) => updatePending(i, { name: v })}
-              onQty={(i, v) => rescalePending(i, v)}
-              onField={(i, field, v) => updatePending(i, { [field]: v } as Partial<FoodItem>)}
-              onDelete={(i) => setPending(pending.filter((_, idx) => idx !== i))}
+        {tab === "meals" && (
+          <>
+            <section className={card}>
+              <h2 className="mb-3 font-semibold">Ajouter ce que vous avez mangé</h2>
+              <select className={`${field} mb-3 w-full`} value={slot} onChange={(e) => setSlot(e.target.value)}>
+                {daySlotList.map((s) => (
+                  <option key={s.key} value={s.key}>{s.label} · {s.time}</option>
+                ))}
+              </select>
+              <textarea
+                className={`${field} w-full`}
+                rows={4}
+                placeholder="Ex. 4 œufs, 170 g de riz basmati, un peu d'huile d'olive"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
+                  {loading ? "Analyse…" : "Analyser"}
+                </button>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+              </div>
+            </section>
+
+            <Photo onResult={(items, qs) => setPendingFrom(items, qs)} />
+
+            <MealBuilder onPick={(items) => setPendingFrom(items)} />
+
+            {questions.length > 0 && (
+              <section className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+                <p className="font-semibold">Précisions demandées</p>
+                <ul className="mt-1 list-disc pl-5">{questions.map((q, i) => <li key={i}>{q}</li>)}</ul>
+              </section>
+            )}
+
+            {pendingBlock}
+
+            <section className={card}>
+              <h2 className="mb-3 font-semibold">Repas du {date}</h2>
+              {dayEntries.length === 0 && <p className="text-sm text-gray-400">Rien d'enregistré pour ce jour.</p>}
+              {dayEntries.length > 0 && (
+                <EntryTable
+                  rows={dayEntries}
+                  withIds
+                  onName={(_, v, id) => editEntry(id!, { name: v })}
+                  onQty={(_, v, id) => rescaleEntry(dayEntries.find((e) => e.id === id)!, v)}
+                  onField={(_, field, v, id) => editEntry(id!, { [field]: v } as Partial<Entry>)}
+                  onDelete={(_, id) => removeEntry(id!)}
+                />
+              )}
+            </section>
+          </>
+        )}
+
+        {tab === "plan" && (
+          <>
+            <Advice slots={slotStatus} remaining={remaining} />
+            <Summary
+              remaining={remaining}
+              sex={profile.sex}
+              dinnerPlanned={slotStatus.some((s) => s.key === "dinner" && !s.done)}
             />
-            <div className="mt-4 flex flex-col gap-3 rounded-xl bg-gray-50 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <span>
-                Total : <b>{Math.round(pendingTotal.calories)} kcal</b> · P {Math.round(pendingTotal.proteins)} g · G {Math.round(pendingTotal.carbs)} g · L {Math.round(pendingTotal.fats)} g
-              </span>
-              <button onClick={addToJournal} className={btnPrimary}>Ajouter au journal</button>
+          </>
+        )}
+
+        {tab === "track" && (
+          <>
+            <Weights date={date} />
+            <Water date={date} profile={profile} />
+          </>
+        )}
+
+        {tab === "profile" && (
+          <section className={`${card} space-y-4`}>
+            <h2 className="font-semibold">Mon profil</h2>
+            <p className="text-sm text-gray-600">
+              {profile.first_name || "Prénom non renseigné"} · {profile.sex} · {profile.age} ans · {profile.height_cm} cm
+            </p>
+            <p className="text-sm text-gray-600">
+              Poids {profile.weight_kg} kg · objectif {profile.target_weight_kg} kg
+            </p>
+            <p className="text-sm text-gray-600">
+              Objectifs estimés : {goals.calories} kcal · P {goals.protein_g} g · G {goals.carbs_g} g · L {goals.fat_g} g
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button onClick={() => setEditing(true)} className={btnPrimary}>Modifier mon profil</button>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="w-full rounded-full border border-gray-300 px-5 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto sm:py-2.5"
+              >
+                Déconnexion
+              </button>
             </div>
           </section>
         )}
-
-        {lastComment && (
-          <section className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900 ring-1 ring-emerald-200">
-            <p>{lastComment}</p>
-          </section>
-        )}
-
-        <Advice slots={slotStatus} remaining={remaining} />
-
-        <Summary
-          remaining={remaining}
-          sex={profile.sex}
-          dinnerPlanned={slotStatus.some((s) => s.key === "dinner" && !s.done)}
-        />
-
-        <section className={card}>
-          <h2 className="mb-3 font-semibold">Repas du {date}</h2>
-          {dayEntries.length === 0 && <p className="text-sm text-gray-400">Rien d'enregistré pour ce jour.</p>}
-          {dayEntries.length > 0 && (
-            <EntryTable
-              rows={dayEntries}
-              withIds
-              onName={(_, v, id) => editEntry(id!, { name: v })}
-              onQty={(_, v, id) => rescaleEntry(dayEntries.find((e) => e.id === id)!, v)}
-              onField={(_, field, v, id) => editEntry(id!, { [field]: v } as Partial<Entry>)}
-              onDelete={(_, id) => removeEntry(id!)}
-            />
-          )}
-        </section>
-
-        <Weights date={date} />
-
-        <Water date={date} profile={profile} />
       </main>
+
+      {tab === "home" && (
+        <button
+          onClick={() => setTab("meals")}
+          aria-label="Ajouter un repas"
+          className="fixed bottom-20 right-4 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-3xl text-white shadow-lg hover:bg-emerald-700"
+        >
+          +
+        </button>
+      )}
+
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-200 bg-white/95 backdrop-blur">
+        <ul className="mx-auto flex max-w-2xl justify-around pb-[env(safe-area-inset-bottom)]">
+          {TABS.map((t) => (
+            <li key={t.key}>
+              <button
+                onClick={() => setTab(t.key)}
+                className={`flex flex-col items-center gap-0.5 px-3 py-2 text-xs ${
+                  tab === t.key ? "font-semibold text-emerald-700" : "text-gray-500"
+                }`}
+              >
+                <span className="text-xl leading-none">{t.icon}</span>
+                {t.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </div>
   );
 }
