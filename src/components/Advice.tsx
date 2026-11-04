@@ -67,84 +67,68 @@ export default function Advice({ slots, remaining }: Props) {
       : `Il reste ${r0(remaining.calories)} kcal et ${r0(remaining.proteins_g)} g de protéines à répartir.`;
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="font-semibold">Plan de la journée</h2>
-        <button
-          onClick={() => run(offset < 0 ? 0 : offset + 1)}
-          disabled={loading || pending.length === 0}
-          className="w-full rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto"
-        >
-          {loading ? "Calcul…" : offset < 0 ? "Proposer le plan" : "Alternatives"}
-        </button>
+    <section className="space-y-4">
+      <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="font-semibold">Plan de la journée</h2>
+          <button
+            onClick={() => run(offset < 0 ? 0 : offset + 1)}
+            disabled={loading || pending.length === 0}
+            className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {loading ? "Calcul…" : offset < 0 ? "Proposer" : "Alternatives"}
+          </button>
+        </div>
+        <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </div>
 
-      <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {slots.map((s) => {
+        const plan = plans.find((p) => p.slot === s.key);
+        const isDinner = s.key === "dinner";
+        return (
+          <div key={s.key} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-gray-900">{s.label}</p>
+                <p className="text-xs text-gray-400">{s.time}</p>
+              </div>
+              {s.done ? (
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">✔ Mangé</span>
+              ) : (
+                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">À venir</span>
+              )}
+            </div>
 
-      <div className="-mx-1 overflow-x-auto">
-        <table className="w-full min-w-[28rem] text-xs sm:text-sm">
-          <thead>
-            <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">
-              <th className="py-2 pr-2">Moment</th>
-              <th className="py-2 pr-2">État</th>
-              <th className="py-2">Propositions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {slots.map((s) => {
-              const plan = plans.find((p) => p.slot === s.key);
-              const isDinner = s.key === "dinner";
-              return (
-                <tr key={s.key} className="border-b border-gray-100 align-top">
-                  <td className="py-3 pr-2 font-medium">
-                    {s.label}
-                    <div className="text-[11px] font-normal text-gray-400">{s.time}</div>
-                  </td>
-                  <td className="py-3 pr-2">
-                    {s.done ? (
-                      <div className="text-emerald-700">
-                        ✔ Déjà mangé
-                        <div className="text-[11px] text-gray-500">
-                          {r0(s.eaten.calories)} kcal · P {r1(s.eaten.proteins)} g · G {r1(s.eaten.carbs)} g · L {r1(s.eaten.fats)} g
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">À venir</span>
-                    )}
-                  </td>
-                  <td className="py-3">
-                    {s.done ? (
-                      <span className="text-gray-300">—</span>
-                    ) : plan ? (
-                      <>
-                        {plan.options.map((o, i) => (
-                          <div key={i} className="mb-2 rounded-xl bg-gray-50 p-3">
-                            <p className="font-medium">{o.title}</p>
-                            <p className="text-xs text-emerald-700">
-                              {r0(o.kcal)} kcal · P {r1(o.p)} g · G {r1(o.c)} g · L {r1(o.f)} g
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {o.foods.map((f) => `${f.name} ${f.grams} g`).join(" · ")}
-                            </p>
-                          </div>
-                        ))}
-                        {isDinner && (
-                          <ul className="list-disc pl-5 text-[11px] text-gray-400">
-                            {DINNER_LIMITS.map((l) => <li key={l}>{l}</li>)}
-                          </ul>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-gray-300">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+            {s.done && (
+              <p className="mt-2 text-xs text-gray-500">
+                {r0(s.eaten.calories)} kcal · P {r1(s.eaten.proteins)} g · G {r1(s.eaten.carbs)} g · L {r1(s.eaten.fats)} g
+              </p>
+            )}
+
+            {!s.done && plan && (
+              <div className="mt-3 space-y-2">
+                {plan.options.map((o, i) => (
+                  <div key={i} className="rounded-xl bg-gray-50 p-3">
+                    <p className="text-sm font-medium">{o.title}</p>
+                    <p className="text-xs font-medium text-emerald-700">
+                      {r0(o.kcal)} kcal · P {r1(o.p)} g · G {r1(o.c)} g · L {r1(o.f)} g
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {o.foods.map((f) => `${f.name} ${f.grams} g`).join(" · ")}
+                    </p>
+                  </div>
+                ))}
+                {isDinner && (
+                  <ul className="list-disc pl-5 text-[11px] text-gray-400">
+                    {DINNER_LIMITS.map((l) => <li key={l}>{l}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </section>
   );
 }
