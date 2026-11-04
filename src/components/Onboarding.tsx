@@ -10,6 +10,7 @@ const field = "w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outlin
 const label = "mb-1.5 block text-sm font-medium text-gray-700";
 
 export default function Onboarding({ initial, onDone }: Props) {
+  const [firstName, setFirstName] = useState(initial?.first_name ?? "");
   const [sex, setSex] = useState<Sex>(initial?.sex ?? "homme");
   const [age, setAge] = useState(String(initial?.age ?? ""));
   const [height, setHeight] = useState(String(initial?.height_cm ?? ""));
@@ -27,7 +28,16 @@ export default function Onboarding({ initial, onDone }: Props) {
     if (w < 30 || w > 300) return setError("Le poids actuel doit être entre 30 et 300 kg.");
     if (t < 30 || t > 300) return setError("Le poids cible doit être entre 30 et 300 kg.");
     setError(null);
-    onDone({ sex, age: a, height_cm: h, weight_kg: w, target_weight_kg: t, goal, activity });
+    onDone({
+      first_name: firstName.trim() || undefined,
+      sex,
+      age: a,
+      height_cm: h,
+      weight_kg: w,
+      target_weight_kg: t,
+      goal,
+      activity,
+    });
   }
 
   return (
@@ -36,6 +46,11 @@ export default function Onboarding({ initial, onDone }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Votre profil</h1>
           <p className="mt-1 text-sm text-gray-500">Ces informations servent à estimer vos besoins. Vous pourrez les modifier à tout moment.</p>
+        </div>
+
+        <div>
+          <span className={label}>Prénom</span>
+          <input className={field} value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="ex. Chouaib" />
         </div>
 
         <div>

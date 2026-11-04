@@ -13,6 +13,7 @@ export async function loadCloudProfile(): Promise<Profile | null> {
   const { data } = await supabase.from("profiles").select("*").eq("id", uid).maybeSingle();
   if (!data) return null;
   return {
+    first_name: data.first_name ?? undefined,
     sex: data.sex,
     age: data.age,
     height_cm: Number(data.height_cm),

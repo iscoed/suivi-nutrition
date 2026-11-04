@@ -1,18 +1,19 @@
-import Photo from "./components/Photo";
-import Summary from "./components/Summary";
-import Weights from "./components/Weights";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
 import Onboarding from "./components/Onboarding";
 import Advice, { type SlotStatus } from "./components/Advice";
 import Water from "./components/Water";
+import Weights from "./components/Weights";
+import Summary from "./components/Summary";
+import Photo from "./components/Photo";
 import { estimateMeal } from "./lib/estimate";
 import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
 import { newId, rescale, todayKey, totals, type Entry } from "./lib/journal";
 import { mealComment, sumItems } from "./lib/comment";
 import { daySlots } from "./lib/planning";
+import { proverbOfDay } from "./lib/proverbs";
 import {
   loadCloudProfile, saveCloudProfile, loadCloudEntries, insertCloudEntries,
   updateCloudEntry, deleteCloudEntry,
@@ -143,7 +144,7 @@ export default function App() {
       const out = await estimateMeal(description);
       setPending(out.items);
       setQuestions(out.questions);
-      if (out.items.length === 0) setError("Aucun aliment reconnu. Précisez votre repas.");
+      if (out.items.length === 0 && out.questions.length === 0) setError("Aucun aliment reconnu. Précisez votre repas.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -195,9 +196,12 @@ export default function App() {
       <header className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 px-4 pb-16 pt-8 text-white">
         <div className="mx-auto flex max-w-2xl items-start justify-between">
           <div>
-            <p className="text-sm text-emerald-100">Bonjour 👋</p>
+            <p className="text-sm text-emerald-100">
+              {profile.first_name ? `Bonjour ${profile.first_name} 👋` : "Bonjour 👋"}
+            </p>
             <h1 className="text-2xl font-bold">Suivi nutrition</h1>
-            <p className="mt-1 text-sm text-emerald-50">
+            <p className="mt-2 text-sm italic text-emerald-50">« {proverbOfDay()} »</p>
+            <p className="mt-2 text-sm text-emerald-50">
               {profile.weight_kg} kg · objectif {profile.target_weight_kg} kg
               {diffKg > 0 && ` · ${diffKg} kg à perdre`}
               {diffKg < 0 && ` · ${Math.abs(diffKg)} kg à prendre`}
@@ -245,16 +249,17 @@ export default function App() {
             <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
               {loading ? "Analyse…" : "Analyser"}
             </button>
-                            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
-                  <Photo
+        </section>
+
+        <Photo
           onResult={(items, qs) => {
             setPending(items);
             setQuestions(qs);
             setError(null);
           }}
         />
-        </section>
 
         {questions.length > 0 && (
           <section className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
@@ -289,11 +294,13 @@ export default function App() {
         )}
 
         <Advice slots={slotStatus} remaining={remaining} />
+
         <Summary
           remaining={remaining}
-          sex={(profile.sex as "homme" | "femme") ?? "homme"}
+          sex={profile.sex}
           dinnerPlanned={slotStatus.some((s) => s.key === "dinner" && !s.done)}
         />
+
         <section className={card}>
           <h2 className="mb-3 font-semibold">Repas du {date}</h2>
           {dayEntries.length === 0 && <p className="text-sm text-gray-400">Rien d'enregistré pour ce jour.</p>}
@@ -308,7 +315,9 @@ export default function App() {
             />
           )}
         </section>
+
         <Weights date={date} />
+
         <Water date={date} profile={profile} />
       </main>
     </div>
