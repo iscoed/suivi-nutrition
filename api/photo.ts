@@ -1,4 +1,4 @@
-const PROMPT = `Tu lis une photo d'emballage alimentaire. Réponds en français, UNIQUEMENT avec un objet JSON valide.
+const PROMPT = `Tu lis une photo d'emballage alimentaire. Réponds en français, UNIQUEMENT avec un objet JSON valide, sans texte autour.
 
 Schéma : {"name":string,"serving_g":number|null,"per100":{"kcal":number,"proteins":number,"carbs":number,"fats":number}|null,"readable":boolean}
 
@@ -8,6 +8,7 @@ Schéma : {"name":string,"serving_g":number|null,"per100":{"kcal":number,"protei
 - readable : false si la photo est floue ou ne contient pas de tableau nutritionnel.
 N'invente jamais de chiffre.`;
 
+const MODEL = "gemini-2.5-flash";
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
 export default async function handler(req: any, res: any) {
@@ -17,37 +18,37 @@ export default async function handler(req: any, res: any) {
   if (typeof image !== "string" || image.length < 100) {
     return res.status(400).json({ error: "Photo manquante" });
   }
-  const dataUrl = image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}`;
+  const base64 = image.includes(",") ? image.split(",")[1] : image;
 
-  const apiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url: dataUrl } },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 600,
-      temperature: 0.1,
-    }),
-  });
+  const apiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": process.env.GEMINI_API_KEY ?? "",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: PROMPT },
+              { inlineData: { mimeType: "image/jpeg", data: base64 } },
+            ],
+          },
+        ],
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: 800, temperature: 0.1 },
+      }),
+    }
+  );
 
   if (!apiRes.ok) {
     return res.status(502).json({ error: "Service photo indisponible", detail: (await apiRes.text()).slice(0, 300) });
   }
 
   const data = await apiRes.json();
-  const text: string = data.choices?.[0]?.message?.content ?? "";
+  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   let info: any;
   try {
     info = JSON.parse(text.replace(/```json|```/g, "").trim());
