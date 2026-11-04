@@ -1,6 +1,14 @@
 export type SlotKey = "breakfast" | "snack1" | "lunch" | "snack2" | "dinner";
 export interface Slot { key: SlotKey; label: string; time: string; }
 
+export const SLOT_COLOR: Record<string, { bg: string; ring: string; text: string }> = {
+  breakfast: { bg: "bg-amber-50", ring: "ring-amber-200", text: "text-amber-800" },
+  snack1: { bg: "bg-teal-50", ring: "ring-teal-200", text: "text-teal-800" },
+  lunch: { bg: "bg-emerald-50", ring: "ring-emerald-200", text: "text-emerald-800" },
+  snack2: { bg: "bg-sky-50", ring: "ring-sky-200", text: "text-sky-800" },
+  dinner: { bg: "bg-violet-50", ring: "ring-violet-200", text: "text-violet-800" },
+};
+
 export function daySlots(d: Date = new Date()): Slot[] {
   const n = d.getDay();
   if (n === 0 || n === 6) {

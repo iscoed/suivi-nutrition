@@ -15,7 +15,7 @@ import type { FoodItem } from "./lib/types";
 import { computeGoals, type Profile } from "./lib/profile";
 import { newId, rescale, todayKey, totals, type Entry } from "./lib/journal";
 import { mealComment, sumItems } from "./lib/comment";
-import { daySlots } from "./lib/planning";
+import { daySlots, SLOT_COLOR } from "./lib/planning";
 import { proverbOfDay } from "./lib/proverbs";
 import {
   loadCloudProfile, saveCloudProfile, loadCloudEntries, insertCloudEntries,
@@ -55,7 +55,7 @@ function NumInput({ value, onCommit, className = "w-14 sm:w-16" }: { value: numb
   return (
     <input
       key={value}
-      className={`${className} rounded-lg border border-gray-200 px-1.5 py-1 text-right text-sm outline-none focus:border-emerald-500`}
+      className={`${className} rounded-lg border border-gray-200 bg-white px-1.5 py-1 text-right text-sm outline-none focus:border-emerald-500`}
       inputMode="decimal"
       defaultValue={String(value)}
       onBlur={(e) => onCommit(parseNum(e.target.value))}
@@ -349,19 +349,29 @@ export default function App() {
 
             {pendingBlock}
 
-            <section className={card}>
-              <h2 className="mb-3 font-semibold">Repas du {date}</h2>
+            <section className="space-y-3">
+              <h2 className="font-semibold">Repas du {date}</h2>
               {dayEntries.length === 0 && <p className="text-sm text-gray-400">Rien d'enregistré pour ce jour.</p>}
-              {dayEntries.length > 0 && (
-                <EntryTable
-                  rows={dayEntries}
-                  withIds
-                  onName={(_, v, id) => editEntry(id!, { name: v })}
-                  onQty={(_, v, id) => rescaleEntry(dayEntries.find((e) => e.id === id)!, v)}
-                  onField={(_, field, v, id) => editEntry(id!, { [field]: v } as Partial<Entry>)}
-                  onDelete={(_, id) => removeEntry(id!)}
-                />
-              )}
+              {daySlotList.map((s) => {
+                const list = dayEntries.filter((e) => e.slot === s.key);
+                if (list.length === 0) return null;
+                const c = SLOT_COLOR[s.key];
+                return (
+                  <div key={s.key} className={`rounded-2xl p-4 ring-1 ${c.bg} ${c.ring}`}>
+                    <p className={`mb-2 text-sm font-semibold ${c.text}`}>
+                      {s.label} · {s.time}
+                    </p>
+                    <EntryTable
+                      rows={list}
+                      withIds
+                      onName={(_, v, id) => editEntry(id!, { name: v })}
+                      onQty={(_, v, id) => rescaleEntry(list.find((e) => e.id === id)!, v)}
+                      onField={(_, field, v, id) => editEntry(id!, { [field]: v } as Partial<Entry>)}
+                      onDelete={(_, id) => removeEntry(id!)}
+                    />
+                  </div>
+                );
+              })}
             </section>
           </>
         )}
@@ -482,10 +492,10 @@ function EntryTable({ rows, onName, onQty, onField, onDelete, withIds }: TablePr
           {rows.map((r, i) => {
             const id = withIds ? (r as Entry).id : undefined;
             return (
-              <tr key={id ?? i} className={`border-b border-gray-100 align-top ${r.confidence === "low" ? "bg-amber-50" : ""}`}>
+              <tr key={id ?? i} className={`border-b border-black/5 align-top ${r.confidence === "low" ? "bg-amber-100/60" : ""}`}>
                 <td className="py-2 pr-2">
                   <input
-                    className="w-full rounded-md border border-transparent px-1 py-0.5 outline-none hover:border-gray-200 focus:border-emerald-500"
+                    className="w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 outline-none hover:border-gray-200 focus:border-emerald-500"
                     defaultValue={r.name}
                     onBlur={(e) => onName(i, e.target.value, id)}
                   />
