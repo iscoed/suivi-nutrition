@@ -8,7 +8,7 @@ Schéma : {"name":string,"serving_g":number|null,"per100":{"kcal":number,"protei
 - readable : false si la photo est floue ou ne contient pas de tableau nutritionnel.
 N'invente jamais de chiffre.`;
 
-const MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const MODEL = "qwen/qwen3.8-27b";
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
 export default async function handler(req: any, res: any) {
