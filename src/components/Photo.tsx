@@ -42,8 +42,8 @@ export default function Photo({ onResult }: Props) {
         body: JSON.stringify({ image, quantity_g }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? "Photo indisponible");
-      onResult(data.items ?? [], data.clarifying_questions ?? []);
+      if (!r.ok) throw new Error(`${data.error ?? "Photo indisponible"} : ${String(data.detail ?? "").slice(0, 300)}`);
+            onResult(data.items ?? [], data.clarifying_questions ?? []);
     } catch (err) {
       setError((err as Error).message);
     } finally {
