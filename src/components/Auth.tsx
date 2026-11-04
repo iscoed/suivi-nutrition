@@ -21,8 +21,12 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 p-4">
-      <form onSubmit={submit} className="w-full max-w-sm space-y-4 rounded-3xl bg-white p-8 shadow-xl">
+    <div
+      className="relative flex min-h-screen items-center justify-center bg-cover bg-center p-4"
+      style={{ backgroundImage: "url(/images/connexion.jpg)" }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-800/80 via-emerald-600/70 to-teal-500/60" />
+      <form onSubmit={submit} className="relative w-full max-w-sm space-y-4 rounded-3xl bg-white/95 p-8 shadow-xl backdrop-blur">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Suivi nutrition</h1>
           <p className="mt-1 text-sm text-gray-500">
