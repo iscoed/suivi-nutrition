@@ -46,7 +46,6 @@ const TAB_IMAGE: Record<Tab, string> = {
 const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5";
 const field = "rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
 const btnPrimary = "w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto sm:py-2.5";
-const btnGhost = "text-sm font-medium text-white/90 hover:text-white";
 
 const parseNum = (v: string) => {
   const n = Number(v.replace(",", "."));
