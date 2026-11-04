@@ -1,3 +1,4 @@
+import Voice from "./components/Voice";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
@@ -290,7 +291,7 @@ export default function App() {
                 placeholder="Ex. 4 œufs, 170 g de riz basmati, un peu d'huile d'olive"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-              />
+              />               <Voice onText={(t) => setDescription((d) => (d ? `${d} ${t}` : t))} />
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
                   {loading ? "Analyse…" : "Analyser"}
