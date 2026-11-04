@@ -36,6 +36,7 @@ export default async function handler(req: any, res: any) {
     temperature: 0.1,
   });
 
+  // Saturation temporaire : on réessaie jusqu'à 3 fois
   let apiRes: Response | null = null;
   for (let attempt = 1; attempt <= 3; attempt++) {
     apiRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -46,7 +47,6 @@ export default async function handler(req: any, res: any) {
       },
       body,
     });
-    // Saturation temporaire : on attend un peu puis on réessaie
     if (apiRes.status !== 500 && apiRes.status !== 503 && apiRes.status !== 429) break;
     await new Promise((r) => setTimeout(r, attempt * 2000));
   }
@@ -56,10 +56,6 @@ export default async function handler(req: any, res: any) {
       error: "Service photo indisponible",
       detail: apiRes ? (await apiRes.text()).slice(0, 300) : "Aucune réponse",
     });
-  }
-
-  if (!apiRes.ok) {
-    return res.status(502).json({ error: "Service photo indisponible", detail: (await apiRes.text()).slice(0, 300) });
   }
 
   const data = await apiRes.json();
@@ -78,12 +74,13 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  // La quantité saisie est prioritaire, sinon la portion indiquée sur l'emballage
   const qty = Number(quantity_g) || info.serving_g;
   if (!qty) {
+    // On renvoie les valeurs lues, pour que l'écran calcule dès que la quantité est saisie
     return res.status(200).json({
       items: [],
       clarifying_questions: ["Quelle quantité avez-vous consommée (en grammes ou ml) ?"],
+      product: { name: info.name || "Produit", serving_g: null, per100: info.per100 },
     });
   }
 
