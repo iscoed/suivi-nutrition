@@ -1,3 +1,4 @@
+import Chat from "./components/Chat";
 import Voice from "./components/Voice";
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
@@ -21,13 +22,14 @@ import {
   updateCloudEntry, deleteCloudEntry,
 } from "./lib/cloud";
 
-type Tab = "home" | "meals" | "plan" | "track" | "profile";
+type Tab = "home" | "meals" | "plan" | "track" | "chat" | "profile";
 
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "home", label: "Accueil", icon: "🏠" },
   { key: "meals", label: "Repas", icon: "🍽️" },
   { key: "plan", label: "Plan", icon: "📋" },
   { key: "track", label: "Suivi", icon: "📈" },
+  { key: "chat", label: "Questions", icon: "💬" },
   { key: "profile", label: "Profil", icon: "👤" },
 ];
 
@@ -347,7 +349,19 @@ export default function App() {
             <Water date={date} profile={profile} />
           </>
         )}
-
+        {tab === "chat" && (
+          <Chat
+            context={{
+              sex: profile.sex,
+              age: profile.age,
+              weight_kg: profile.weight_kg,
+              target_weight_kg: profile.target_weight_kg,
+              goal: profile.goal,
+              objectifs_jour: goals,
+              reste_aujourd_hui: remaining,
+            }}
+          />
+        )}
         {tab === "profile" && (
           <section className={`${card} space-y-4`}>
             <h2 className="font-semibold">Mon profil</h2>
