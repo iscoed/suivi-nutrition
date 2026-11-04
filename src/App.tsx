@@ -211,9 +211,19 @@ export default function App() {
     setError(null);
   }
 
-  const pendingBlock = pending.length > 0 && (
+    const pendingBlock = pending.length > 0 && (
     <section className={card}>
       <h2 className="mb-3 font-semibold">À vérifier avant d'enregistrer</h2>
+
+      <div className="mb-4">
+        <label className="mb-1 block text-sm font-medium text-gray-700">Ajouter à quel moment ?</label>
+        <select className={`${field} w-full`} value={slot} onChange={(e) => setSlot(e.target.value)}>
+          {daySlotList.map((s) => (
+            <option key={s.key} value={s.key}>{s.label} · {s.time}</option>
+          ))}
+        </select>
+      </div>
+
       <EntryTable
         rows={pending}
         onName={(i, v) => updatePending(i, { name: v })}
@@ -225,7 +235,9 @@ export default function App() {
         <span>
           Total : <b>{Math.round(pendingTotal.calories)} kcal</b> · P {Math.round(pendingTotal.proteins)} g · G {Math.round(pendingTotal.carbs)} g · L {Math.round(pendingTotal.fats)} g
         </span>
-        <button onClick={addToJournal} className={btnPrimary}>Ajouter au journal</button>
+        <button onClick={addToJournal} className={btnPrimary}>
+          Ajouter au journal · {daySlotList.find((s) => s.key === slot)?.label ?? ""}
+        </button>
       </div>
     </section>
   );
