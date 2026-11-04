@@ -19,9 +19,9 @@ import {
   updateCloudEntry, deleteCloudEntry,
 } from "./lib/cloud";
 
-const card = "rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100";
+const card = "rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100 sm:p-5";
 const field = "rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
-const btnPrimary = "rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50";
+const btnPrimary = "w-full rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:w-auto sm:py-2.5";
 const btnGhost = "text-sm font-medium text-white/90 hover:text-white";
 
 const parseNum = (v: string) => {
@@ -29,11 +29,11 @@ const parseNum = (v: string) => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-function NumInput({ value, onCommit, className = "w-16" }: { value: number; onCommit: (n: number) => void; className?: string }) {
+function NumInput({ value, onCommit, className = "w-14 sm:w-16" }: { value: number; onCommit: (n: number) => void; className?: string }) {
   return (
     <input
       key={value}
-      className={`${className} rounded-lg border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-emerald-500`}
+      className={`${className} rounded-lg border border-gray-200 px-1.5 py-1 text-right text-sm outline-none focus:border-emerald-500`}
       inputMode="decimal"
       defaultValue={String(value)}
       onBlur={(e) => onCommit(parseNum(e.target.value))}
@@ -54,7 +54,7 @@ function Stat({ label, eaten, goal, unit, color }: { label: string; eaten: numbe
   const over = eaten > goal;
   return (
     <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-medium text-gray-700">{label}</span>
         <span className="text-sm text-gray-500">
           <b className="text-gray-900">{Math.round(eaten)}</b> / {goal} {unit}
@@ -193,13 +193,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f5f7f4] pb-16 text-gray-800">
-      <header className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 px-4 pb-16 pt-8 text-white">
-        <div className="mx-auto flex max-w-2xl items-start justify-between">
-          <div>
+      <header className="bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 px-4 pb-14 pt-6 text-white sm:pt-8">
+        <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <p className="text-sm text-emerald-100">
               {profile.first_name ? `Bonjour ${profile.first_name} 👋` : "Bonjour 👋"}
             </p>
-            <h1 className="text-2xl font-bold">Suivi nutrition</h1>
+            <h1 className="text-xl font-bold sm:text-2xl">Suivi nutrition</h1>
             <p className="mt-2 text-sm italic text-emerald-50">« {proverbOfDay()} »</p>
             <p className="mt-2 text-sm text-emerald-50">
               {profile.weight_kg} kg · objectif {profile.target_weight_kg} kg
@@ -208,18 +208,18 @@ export default function App() {
               {diffKg === 0 && " · objectif atteint"}
             </p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex shrink-0 gap-4">
             <button onClick={() => setEditing(true)} className={btnGhost}>Profil</button>
             <button onClick={() => supabase.auth.signOut()} className={btnGhost}>Déconnexion</button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto -mt-10 max-w-2xl space-y-5 px-4">
+      <main className="mx-auto -mt-10 max-w-2xl space-y-4 px-3 sm:space-y-5 sm:px-4">
         <section className={card}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="font-semibold">Ma journée</h2>
-            <input type="date" className={field} value={date} onChange={(e) => setDate(e.target.value)} />
+            <input type="date" className={`${field} w-full sm:w-auto`} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className="space-y-4">
             <Stat label="Calories" eaten={eaten.calories} goal={goals.calories} unit="kcal" color={BAR.kcal} />
@@ -232,7 +232,7 @@ export default function App() {
         <section className={card}>
           <h2 className="mb-3 font-semibold">Ajouter ce que vous avez mangé</h2>
           <div className="mb-3">
-            <select className={field} value={slot} onChange={(e) => setSlot(e.target.value)}>
+            <select className={`${field} w-full`} value={slot} onChange={(e) => setSlot(e.target.value)}>
               {daySlotList.map((s) => (
                 <option key={s.key} value={s.key}>{s.label} · {s.time}</option>
               ))}
@@ -245,7 +245,7 @@ export default function App() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
             <button onClick={analyze} disabled={loading || !description.trim()} className={btnPrimary}>
               {loading ? "Analyse…" : "Analyser"}
             </button>
@@ -278,7 +278,7 @@ export default function App() {
               onField={(i, field, v) => updatePending(i, { [field]: v } as Partial<FoodItem>)}
               onDelete={(i) => setPending(pending.filter((_, idx) => idx !== i))}
             />
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 text-sm">
+            <div className="mt-4 flex flex-col gap-3 rounded-xl bg-gray-50 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <span>
                 Total : <b>{Math.round(pendingTotal.calories)} kcal</b> · P {Math.round(pendingTotal.proteins)} g · G {Math.round(pendingTotal.carbs)} g · L {Math.round(pendingTotal.fats)} g
               </span>
@@ -335,10 +335,10 @@ interface TableProps {
 
 function EntryTable({ rows, onName, onQty, onField, onDelete, withIds }: TableProps) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="-mx-1 overflow-x-auto">
+      <table className="w-full min-w-[32rem] text-xs sm:text-sm">
         <thead>
-          <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
+          <tr className="border-b border-gray-200 text-left text-[10px] uppercase tracking-wide text-gray-500 sm:text-xs">
             <th className="py-2 pr-2">Aliment</th>
             <th className="px-1 py-2 text-right">g</th>
             <th className="px-1 py-2 text-right">kcal</th>
@@ -354,16 +354,20 @@ function EntryTable({ rows, onName, onQty, onField, onDelete, withIds }: TablePr
             return (
               <tr key={id ?? i} className={`border-b border-gray-100 align-top ${r.confidence === "low" ? "bg-amber-50" : ""}`}>
                 <td className="py-2 pr-2">
-                  <input className="w-full rounded-md border border-transparent px-1 py-0.5 outline-none hover:border-gray-200 focus:border-emerald-500" defaultValue={r.name} onBlur={(e) => onName(i, e.target.value, id)} />
-                  {r.assumption && <div className="px-1 text-xs text-gray-400">{r.assumption}</div>}
+                  <input
+                    className="w-full min-w-[7rem] rounded-md border border-transparent px-1 py-0.5 outline-none hover:border-gray-200 focus:border-emerald-500"
+                    defaultValue={r.name}
+                    onBlur={(e) => onName(i, e.target.value, id)}
+                  />
+                  {r.assumption && <div className="px-1 text-[11px] leading-tight text-gray-400">{r.assumption}</div>}
                 </td>
-                <td className="px-1 py-2"><NumInput value={r.quantity_g} onCommit={(v) => onQty(i, v, id)} /></td>
-                <td className="px-1 py-2"><NumInput value={Math.round(r.calories)} onCommit={(v) => onField(i, "calories", v, id)} /></td>
-                <td className="px-1 py-2"><NumInput className="w-14" value={r.proteins_g} onCommit={(v) => onField(i, "proteins_g", v, id)} /></td>
-                <td className="px-1 py-2"><NumInput className="w-14" value={r.carbs_g} onCommit={(v) => onField(i, "carbs_g", v, id)} /></td>
-                <td className="px-1 py-2"><NumInput className="w-14" value={r.fats_g} onCommit={(v) => onField(i, "fats_g", v, id)} /></td>
-                <td className="py-2 pl-2">
-                  <button onClick={() => onDelete(i, id)} className="text-xs font-medium text-red-500 hover:text-red-700">Supprimer</button>
+                <td className="px-1 py-2"><NumInput className="w-12 sm:w-16" value={r.quantity_g} onCommit={(v) => onQty(i, v, id)} /></td>
+                <td className="px-1 py-2"><NumInput className="w-12 sm:w-16" value={Math.round(r.calories)} onCommit={(v) => onField(i, "calories", v, id)} /></td>
+                <td className="px-1 py-2"><NumInput className="w-10 sm:w-14" value={r.proteins_g} onCommit={(v) => onField(i, "proteins_g", v, id)} /></td>
+                <td className="px-1 py-2"><NumInput className="w-10 sm:w-14" value={r.carbs_g} onCommit={(v) => onField(i, "carbs_g", v, id)} /></td>
+                <td className="px-1 py-2"><NumInput className="w-10 sm:w-14" value={r.fats_g} onCommit={(v) => onField(i, "fats_g", v, id)} /></td>
+                <td className="py-2 pl-1">
+                  <button onClick={() => onDelete(i, id)} className="text-xs font-medium text-red-500 hover:text-red-700">✕</button>
                 </td>
               </tr>
             );
