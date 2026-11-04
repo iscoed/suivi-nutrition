@@ -8,7 +8,7 @@ Schéma : {"name":string,"serving_g":number|null,"per100":{"kcal":number,"protei
 - readable : false si la photo est floue ou ne contient pas de tableau nutritionnel.
 N'invente jamais de chiffre.`;
 
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.8-flash";
 const round1 = (v: number) => Math.round(v * 10) / 10;
 
 export default async function handler(req: any, res: any) {
